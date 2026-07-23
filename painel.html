@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>VoltOS — Painel</title>
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#12161F" />
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div class="topbar">
+    <div class="brand"><span class="bolt">⚡</span> VoltOS</div>
+    <div class="topbar-right">
+      <a href="admin.html" class="btn-ghost" id="link-admin" style="display:none">Administração</a>
+      <button class="btn-ghost" id="btn-minhas-os" style="display:none">Minhas O.S.</button>
+      <span id="nome-usuario"></span>
+      <span class="chip-papel" id="chip-papel"></span>
+      <button class="btn-ghost" id="btn-sair">Sair</button>
+    </div>
+  </div>
+
+  <div class="container">
+    <div id="banner-ajudante-slot"></div>
+
+    <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:16px; flex-wrap:wrap;">
+      <h2 id="titulo-painel" style="margin:0;">Ordens de Serviço</h2>
+      <button class="btn-primary" id="btn-nova-os">+ Nova O.S.</button>
+    </div>
+
+    <div class="tabs" id="tabs"></div>
+    <div id="lista-os"></div>
+  </div>
+
+  <div id="modal-slot"></div>
+
+  <script type="module" src="js/painel.js"></script>
+  <script src="js/pwa.js"></script>
+</body>
+</html>

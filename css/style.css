@@ -1,0 +1,230 @@
+/* =====================================================================
+   VoltOS — Design tokens
+   Conceito: painel elétrico industrial. Fundo grafite-azulado, texto
+   claro, acento âmbar (fita de sinalização / cobre) e ciano (indicador
+   de tensão). Números de O.S. e horários em mono, como etiqueta de
+   disjuntor. Status vira um "LED" colorido, não um badge genérico.
+   ===================================================================== */
+
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap');
+
+:root {
+  --bg: #12161F;
+  --surface: #1B2130;
+  --surface-2: #232B3D;
+  --border: #2C3547;
+  --text: #EDEFF3;
+  --text-dim: #96A0B5;
+  --accent: #F5A623;
+  --accent-dim: #8A6420;
+  --cyan: #33C9EB;
+  --verde: #3DDC84;
+  --amarelo: #F5C518;
+  --vermelho: #FF5A5F;
+
+  --font-display: 'Space Grotesk', sans-serif;
+  --font-body: 'Inter', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+
+  --radius: 10px;
+  --radius-sm: 6px;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  background-image:
+    radial-gradient(circle at 15% 0%, rgba(51, 201, 235, 0.06), transparent 40%),
+    radial-gradient(circle at 100% 20%, rgba(245, 166, 35, 0.05), transparent 45%);
+  min-height: 100vh;
+}
+
+h1, h2, h3, .display { font-family: var(--font-display); letter-spacing: -0.01em; }
+
+.mono { font-family: var(--font-mono); }
+
+a { color: inherit; }
+
+button {
+  font-family: var(--font-body);
+  cursor: pointer;
+  border: none;
+  border-radius: var(--radius-sm);
+  transition: transform 0.06s ease, filter 0.15s ease, background 0.15s ease;
+}
+button:active { transform: translateY(1px); }
+button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 2px;
+}
+
+input, select, textarea {
+  font-family: var(--font-body);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  font-size: 15px;
+}
+input::placeholder, textarea::placeholder { color: var(--text-dim); }
+
+label { font-size: 13px; color: var(--text-dim); font-weight: 500; display: block; margin-bottom: 6px; }
+
+.btn-primary {
+  background: var(--accent);
+  color: #1A1200;
+  font-weight: 600;
+  padding: 12px 20px;
+  font-size: 15px;
+}
+.btn-primary:hover { filter: brightness(1.08); }
+.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.btn-secondary {
+  background: var(--surface-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  padding: 12px 20px;
+  font-size: 15px;
+}
+.btn-secondary:hover { background: var(--border); }
+
+.btn-danger {
+  background: rgba(255, 90, 95, 0.12);
+  color: var(--vermelho);
+  border: 1px solid rgba(255, 90, 95, 0.35);
+  padding: 10px 16px;
+  font-size: 14px;
+}
+.btn-danger:hover { background: rgba(255, 90, 95, 0.2); }
+
+.btn-ghost {
+  background: transparent;
+  color: var(--text-dim);
+  padding: 8px 12px;
+  font-size: 13px;
+}
+.btn-ghost:hover { color: var(--text); background: var(--surface-2); }
+
+/* -------------------- shell / topo -------------------- */
+.topbar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 20px; border-bottom: 1px solid var(--border);
+  background: rgba(18, 22, 31, 0.85); backdrop-filter: blur(8px);
+  position: sticky; top: 0; z-index: 10;
+}
+.brand { display: flex; align-items: center; gap: 10px; font-family: var(--font-display); font-weight: 700; font-size: 20px; }
+.brand .bolt { color: var(--accent); }
+.topbar-right { display: flex; align-items: center; gap: 12px; font-size: 14px; color: var(--text-dim); }
+.chip-papel {
+  font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em;
+  padding: 3px 8px; border-radius: 20px; border: 1px solid var(--border); font-weight: 600;
+}
+.chip-papel.gestor { color: var(--accent); border-color: var(--accent-dim); }
+
+.container { max-width: 1000px; margin: 0 auto; padding: 20px; }
+
+/* -------------------- banner ajudante -------------------- */
+.banner-ajudante {
+  background: linear-gradient(90deg, rgba(51,201,235,0.15), rgba(51,201,235,0.05));
+  border: 1px solid rgba(51,201,235,0.4);
+  color: var(--cyan);
+  padding: 10px 16px; border-radius: var(--radius-sm);
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 16px; font-size: 14px; font-weight: 500;
+}
+
+/* -------------------- tabs -------------------- */
+.tabs { display: flex; gap: 6px; overflow-x: auto; margin-bottom: 18px; padding-bottom: 2px; }
+.tab {
+  background: var(--surface); border: 1px solid var(--border); color: var(--text-dim);
+  padding: 9px 14px; border-radius: 20px; font-size: 13px; font-weight: 600; white-space: nowrap;
+}
+.tab.ativa { background: var(--accent); color: #1A1200; border-color: var(--accent); }
+.tab .count { opacity: 0.7; margin-left: 4px; }
+
+/* -------------------- card de O.S. -------------------- */
+.os-card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 16px; margin-bottom: 12px; position: relative; overflow: hidden;
+}
+.os-card::before {
+  content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 4px;
+  background: var(--led);
+}
+.os-card.prio-normal { --led: var(--verde); }
+.os-card.prio-prioritaria { --led: var(--amarelo); }
+.os-card.prio-emergencial { --led: var(--vermelho); }
+
+.os-card-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+.os-numero { font-family: var(--font-mono); color: var(--text-dim); font-size: 13px; }
+.os-equip { font-family: var(--font-display); font-weight: 600; font-size: 16px; margin: 2px 0 4px; }
+.os-setor { font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.03em; }
+.os-desc { font-size: 14px; color: var(--text-dim); margin: 8px 0; line-height: 1.5; }
+
+.led-prio {
+  width: 8px; height: 8px; border-radius: 50%; background: var(--led);
+  display: inline-block; box-shadow: 0 0 8px var(--led);
+}
+.tag-prio { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: var(--led); }
+
+.os-meta { display: flex; flex-wrap: wrap; gap: 12px; font-size: 12px; color: var(--text-dim); margin-top: 8px; }
+.os-actions { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+
+.empty-state {
+  text-align: center; padding: 60px 20px; color: var(--text-dim);
+}
+.empty-state .icon { font-size: 32px; margin-bottom: 10px; opacity: 0.5; }
+
+/* -------------------- login -------------------- */
+.login-wrap {
+  min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px;
+}
+.login-card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 16px;
+  padding: 36px 32px; width: 100%; max-width: 380px;
+}
+.login-logo { text-align: center; margin-bottom: 24px; }
+.login-logo .bolt-big { font-size: 32px; color: var(--accent); }
+.login-logo h1 { font-size: 26px; margin: 6px 0 2px; }
+.login-logo p { color: var(--text-dim); font-size: 13px; margin: 0; }
+.pin-input { letter-spacing: 8px; font-family: var(--font-mono); font-size: 20px; text-align: center; }
+.field { margin-bottom: 16px; }
+.error-msg { color: var(--vermelho); font-size: 13px; margin-top: 10px; text-align: center; }
+
+/* -------------------- modal -------------------- */
+.modal-overlay {
+  position: fixed; inset: 0; background: rgba(10,12,18,0.7); backdrop-filter: blur(3px);
+  display: flex; align-items: center; justify-content: center; z-index: 100; padding: 16px;
+}
+.modal {
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+  width: 100%; max-width: 460px; max-height: 90vh; overflow-y: auto; padding: 24px;
+}
+.modal h2 { margin-top: 0; font-size: 19px; }
+.modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 22px; }
+
+.radio-group { display: flex; flex-direction: column; gap: 8px; }
+.radio-option {
+  display: flex; align-items: center; gap: 10px; padding: 10px 12px;
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-sm);
+  font-size: 14px; cursor: pointer;
+}
+.radio-option:has(input:checked) { border-color: var(--accent); background: rgba(245,166,35,0.08); }
+
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+@media (max-width: 520px) {
+  .grid-2 { grid-template-columns: 1fr; }
+  .container { padding: 14px; }
+}

@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>VoltOS — Entrar</title>
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#12161F" />
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div class="login-wrap">
+    <div class="login-card">
+      <div class="login-logo">
+        <div class="bolt-big">⚡</div>
+        <h1>VoltOS</h1>
+        <p>Gestão de manutenções elétricas</p>
+      </div>
+
+      <form id="form-login">
+        <div class="field">
+          <label for="usuario">Usuário</label>
+          <input id="usuario" type="text" autocomplete="username" placeholder="ex: joao.silva" required />
+        </div>
+        <div class="field">
+          <label for="pin">PIN</label>
+          <input id="pin" class="pin-input" type="password" inputmode="numeric" pattern="\d{4}"
+                 maxlength="4" autocomplete="current-password" placeholder="••••" required />
+        </div>
+        <button type="submit" class="btn-primary" style="width:100%" id="btn-entrar">Entrar</button>
+        <p class="error-msg" id="erro" style="display:none"></p>
+      </form>
+    </div>
+  </div>
+
+  <script type="module">
+    import { supabase, slugify } from "./js/supabaseClient.js";
+
+    const form = document.getElementById("form-login");
+    const erro = document.getElementById("erro");
+    const btn = document.getElementById("btn-entrar");
+
+    // já logado? pula direto pro painel
+    supabase.auth.getSession().then(({ data }) => {
+      if (data.session) window.location.href = "painel.html";
+    });
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      erro.style.display = "none";
+      btn.disabled = true;
+      btn.textContent = "Entrando...";
+
+      const usuario = slugify(document.getElementById("usuario").value);
+      const pin = document.getElementById("pin").value;
+      const email = `${usuario}@voltos.local`;
+
+      const { error } = await supabase.auth.signInWithPassword({ email, password: pin });
+
+      if (error) {
+        erro.textContent = "Usuário ou PIN incorretos.";
+        erro.style.display = "block";
+        btn.disabled = false;
+        btn.textContent = "Entrar";
+        return;
+      }
+
+      window.location.href = "painel.html";
+    });
+  </script>
+  <script src="js/pwa.js"></script>
+</body>
+</html>

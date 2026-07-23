@@ -1,0 +1,15 @@
+{
+  "name": "VoltOS — Manutenções Elétricas",
+  "short_name": "VoltOS",
+  "description": "Gestão de ordens de serviço de manutenção elétrica",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#12161F",
+  "theme_color": "#12161F",
+  "icons": [
+    { "src": "icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ]
+}
