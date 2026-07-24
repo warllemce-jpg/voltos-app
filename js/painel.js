@@ -7,6 +7,7 @@ const RETENCAO_DIAS = 7;
 let perfil = null;
 let allOS = [];
 let temposOS = new Map(); // os_id -> { fechados: segundos, desde: ISO string | null }
+let ajudantesPorOS = new Map(); // os_id -> [nomes] dos que estão ajudando agora
 let equipamentos = [];
 let motivosPausa = [];
 let motivosEmergencia = [];
@@ -42,7 +43,7 @@ async function init() {
 
   $("#lista-os").addEventListener("click", onListaClick);
 
-  await Promise.all([carregarLookups(), carregarOS(), carregarTempos(), carregarAjudanteAtivo()]);
+  await Promise.all([carregarLookups(), carregarOS(), carregarTempos(), carregarAjudanteAtivo(), carregarAjudantesPorOS()]);
   render();
 
   // Contador de "tempo de trabalho" das O.S. em andamento sobe sozinho,
@@ -55,7 +56,7 @@ async function init() {
       await Promise.all([carregarOS(), carregarTempos()]); render();
     })
     .on("postgres_changes", { event: "*", schema: "public", table: "ajudante_ativo" }, async () => {
-      await carregarAjudanteAtivo(); render();
+      await Promise.all([carregarAjudanteAtivo(), carregarAjudantesPorOS()]); render();
     })
     .subscribe();
 }
@@ -96,6 +97,21 @@ async function carregarTempos() {
     t.os_id,
     { fechados: Number(t.segundos_fechados) || 0, desde: t.em_execucao_desde },
   ]));
+}
+
+async function carregarAjudantesPorOS() {
+  const { data, error } = await supabase
+    .from("ajudante_ativo")
+    .select("os_id, colaborador:perfis(nome)");
+  if (error) { console.error(error); return; }
+  const mapa = new Map();
+  (data || []).forEach(a => {
+    const nome = a.colaborador?.nome;
+    if (!nome) return;
+    if (!mapa.has(a.os_id)) mapa.set(a.os_id, []);
+    mapa.get(a.os_id).push(nome);
+  });
+  ajudantesPorOS = mapa;
 }
 
 async function carregarAjudanteAtivo() {
@@ -160,15 +176,24 @@ function osParaTab(status) {
     }
   } else if (status === "Pausada") {
     // pausadas da equipe inteira sempre visíveis (para poder retomar)
-  } else if (status === "Concluída" || status === "Cancelada") {
+  } else if (status === "Concluída") {
+    // Todos veem as concluídas da EQUIPE (transparência do tempo total).
+    // O colaborador ainda com retenção de 7 dias pra não virar histórico
+    // infinito; o gestor em "Minhas O.S." filtra pras dele.
+    if (perfil.papel === "gestor" && viewMode === "minhas") {
+      rows = rows.filter(os => os.executado_por === perfil.id || os.criada_por === perfil.id);
+    }
+    if (perfil.papel === "colaborador") {
+      rows = rows.filter(os => os.concluida_em ? diasDesde(os.concluida_em) <= RETENCAO_DIAS : true);
+    }
+  } else if (status === "Cancelada") {
+    // Canceladas seguem restritas: colaborador só vê as próprias (as que
+    // executou/abriu), últimos 7 dias — não é foco de transparência.
     if (souColaboradorOuMinhas) {
       rows = rows.filter(os => os.executado_por === perfil.id || os.criada_por === perfil.id);
     }
     if (perfil.papel === "colaborador") {
-      rows = rows.filter(os => {
-        const marco = status === "Concluída" ? os.concluida_em : os.cancelada_em;
-        return marco ? diasDesde(marco) <= RETENCAO_DIAS : true;
-      });
+      rows = rows.filter(os => os.cancelada_em ? diasDesde(os.cancelada_em) <= RETENCAO_DIAS : true);
     }
   }
   return rows;
@@ -216,6 +241,10 @@ function osCardHtml(os) {
     if (souGestor) acoes += botao("cancelar", os.id, "Cancelar", "btn-danger");
   }
 
+  // Gestor: detalhamento de tempo por pessoa em qualquer O.S. que já teve
+  // trabalho (tudo menos "Aberta")
+  if (souGestor && os.status !== "Aberta") acoes += botao("tempos", os.id, "Tempos", "btn-ghost");
+
   return `
     <div class="os-card ${slugPrio(os.prioridade)}">
       <div class="os-card-top">
@@ -230,6 +259,7 @@ function osCardHtml(os) {
       <div class="os-meta">
         <span>Aberta por ${escapeHtml(os.criador?.nome || "—")} em ${formatarDataCurta(os.criada_em)}</span>
         ${os.executor ? `<span>Executando: ${escapeHtml(os.executor.nome)}</span>` : ""}
+        ${ajudantesHtml(os)}
         ${os.tag ? `<span>Tag: ${escapeHtml(os.tag)}</span>` : ""}
         ${tempoOSHtml(os)}
       </div>
@@ -239,6 +269,15 @@ function osCardHtml(os) {
 
 function botao(action, osId, label, classe) {
   return `<button class="${classe}" data-action="${action}" data-os="${osId}">${label}</button>`;
+}
+
+// Nomes de quem está ajudando AGORA na O.S. (só faz sentido em andamento).
+// Deixa o executor — e a equipe — ver quem entrou pra ajudar.
+function ajudantesHtml(os) {
+  if (os.status !== "Em andamento") return "";
+  const nomes = ajudantesPorOS.get(os.id) || [];
+  if (nomes.length === 0) return "";
+  return `<span>Ajudando: ${nomes.map(escapeHtml).join(", ")}</span>`;
 }
 
 // Tempo de trabalho ATIVO da O.S. (descontando pausas). Para uma O.S. em
@@ -298,6 +337,7 @@ async function onListaClick(e) {
   if (action === "concluir") return abrirModalConcluir(osId);
   if (action === "cancelar") return abrirModalCancelar(osId);
   if (action === "material") return abrirModalMaterial(osId);
+  if (action === "tempos") return abrirModalTempos(osId);
 }
 
 async function chamarRpc(nome, params, btnOrigem) {
@@ -554,4 +594,32 @@ function abrirModalMaterial(osId) {
     if (error) { $("#erro-material").textContent = error.message; $("#erro-material").style.display = "block"; return; }
     fecharModal();
   });
+}
+
+// Gestor: detalhamento de tempo por pessoa (quem executou, quem ajudou,
+// tempo de cada um) + tempo total da O.S. (relógio).
+async function abrirModalTempos(osId) {
+  const os = allOS.find(o => o.id === osId);
+  const total = os ? formatarDuracao(segundosDaOS(os)) : "—";
+
+  abrirModal(`
+    <div class="modal">
+      <h2>Tempos — O.S. #${os?.numero ?? ""}</h2>
+      <div class="horas-total"><span>Tempo total da O.S.</span><strong class="mono">${total}</strong></div>
+      <div id="tempos-lista"><p class="carregando">Carregando...</p></div>
+      <p class="nota-horas">A soma por pessoa pode passar do total da O.S. quando executor e ajudante trabalham ao mesmo tempo — cada um conta o próprio esforço.</p>
+      <div class="modal-actions"><button type="button" class="btn-secondary" data-fechar>Fechar</button></div>
+    </div>`);
+
+  const { data, error } = await supabase.rpc("tempos_por_os", { p_os_id: osId });
+  const lista = $("#tempos-lista");
+  if (error) { lista.innerHTML = `<p class="error-msg" style="display:block">${escapeHtml(error.message)}</p>`; return; }
+  if (!data || data.length === 0) { lista.innerHTML = `<p class="vazio">Ninguém trabalhou nesta O.S. ainda.</p>`; return; }
+
+  lista.innerHTML = data.map(r => `
+    <div class="detalhe-linha">
+      <span class="detalhe-equip">${escapeHtml(r.nome)}</span>
+      <span class="detalhe-tag">${escapeHtml(r.papeis)}</span>
+      <strong class="mono">${formatarDuracao(Number(r.segundos_trabalhados))}</strong>
+    </div>`).join("");
 }
