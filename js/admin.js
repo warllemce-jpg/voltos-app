@@ -5,6 +5,15 @@ const $ = (sel) => document.querySelector(sel);
 let perfil = null;
 let abaAtiva = "colaboradores";
 
+// Nome repetido agora é barrado pelo banco (índice único sobre
+// lower(trim(...)) — ver 06_dedupe_unicidade.sql). Sem tratar o erro, o
+// formulário simplesmente não fazia nada e parecia travado.
+function mensagemDeErro(error) {
+  if (!error) return null;
+  if (error.code === "23505") return "Já existe um item com esse nome.";
+  return error.message;
+}
+
 init();
 
 async function init() {
@@ -164,10 +173,11 @@ async function renderEquipamentos() {
   const { data: equipamentos } = await supabase.from("equipamentos").select("*").order("nome");
 
   el.innerHTML = `
-    <form id="form-novo-equip" style="display:flex; gap:10px; margin-bottom:16px;">
+    <form id="form-novo-equip" style="display:flex; gap:10px; margin-bottom:6px;">
       <input id="f-equip-nome" type="text" placeholder="Nome do equipamento" required style="flex:1" />
       <button type="submit" class="btn-primary">Adicionar</button>
     </form>
+    <p class="error-msg" id="erro-equip" style="display:none; text-align:left; margin-bottom:16px"></p>
     ${(equipamentos || []).map(eq => `
       <div class="os-card" style="--led:${eq.ativo ? "#3DDC84" : "#FF5A5F"}">
         <div class="os-card-top">
@@ -182,7 +192,9 @@ async function renderEquipamentos() {
 
   $("#form-novo-equip").addEventListener("submit", async (e) => {
     e.preventDefault();
-    await supabase.from("equipamentos").insert({ nome: $("#f-equip-nome").value });
+    const { error } = await supabase.from("equipamentos").insert({ nome: $("#f-equip-nome").value.trim() });
+    const msg = mensagemDeErro(error);
+    if (msg) { $("#erro-equip").textContent = msg; $("#erro-equip").style.display = "block"; return; }
     renderEquipamentos();
   });
 
@@ -212,28 +224,34 @@ async function renderMotivos() {
 
   el.innerHTML = `
     <h3>Motivos de pausa</h3>
-    <form id="form-novo-mp" style="display:flex; gap:10px; margin-bottom:16px;">
+    <form id="form-novo-mp" style="display:flex; gap:10px; margin-bottom:6px;">
       <input id="f-mp-nome" type="text" placeholder="Novo motivo de pausa" required style="flex:1" />
       <button type="submit" class="btn-primary">Adicionar</button>
     </form>
+    <p class="error-msg" id="erro-mp" style="display:none; text-align:left; margin-bottom:16px"></p>
     ${listaMotivos(mp, "motivos_pausa")}
 
     <h3 style="margin-top:28px">Motivos de emergência</h3>
-    <form id="form-novo-me" style="display:flex; gap:10px; margin-bottom:16px;">
+    <form id="form-novo-me" style="display:flex; gap:10px; margin-bottom:6px;">
       <input id="f-me-nome" type="text" placeholder="Novo motivo de emergência" required style="flex:1" />
       <button type="submit" class="btn-primary">Adicionar</button>
     </form>
+    <p class="error-msg" id="erro-me" style="display:none; text-align:left; margin-bottom:16px"></p>
     ${listaMotivos(me, "motivos_emergencia")}
   `;
 
   $("#form-novo-mp").addEventListener("submit", async (e) => {
     e.preventDefault();
-    await supabase.from("motivos_pausa").insert({ descricao: $("#f-mp-nome").value, ordem: 50 });
+    const { error } = await supabase.from("motivos_pausa").insert({ descricao: $("#f-mp-nome").value.trim(), ordem: 50 });
+    const msg = mensagemDeErro(error);
+    if (msg) { $("#erro-mp").textContent = msg; $("#erro-mp").style.display = "block"; return; }
     renderMotivos();
   });
   $("#form-novo-me").addEventListener("submit", async (e) => {
     e.preventDefault();
-    await supabase.from("motivos_emergencia").insert({ descricao: $("#f-me-nome").value, ordem: 50 });
+    const { error } = await supabase.from("motivos_emergencia").insert({ descricao: $("#f-me-nome").value.trim(), ordem: 50 });
+    const msg = mensagemDeErro(error);
+    if (msg) { $("#erro-me").textContent = msg; $("#erro-me").style.display = "block"; return; }
     renderMotivos();
   });
 
