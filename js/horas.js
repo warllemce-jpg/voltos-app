@@ -25,6 +25,7 @@ async function init() {
 
   $("#nome-usuario").textContent = perfil.nome;
   $("#btn-sair").addEventListener("click", sair);
+  if (perfil.papel === "gestor") $("#link-relatorio").style.display = "inline-block";
   if (perfil.papel !== "gestor") $("#titulo-horas").textContent = "Minhas horas";
 
   $("#periodos").addEventListener("click", (e) => {

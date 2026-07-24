@@ -9,6 +9,7 @@ const SHELL = [
   "./painel.html",
   "./admin.html",
   "./horas.html",
+  "./relatorio.html",
   "./css/style.css",
   "./manifest.json",
   "./icons/icon.svg",

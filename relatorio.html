@@ -2,8 +2,8 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>VoltOS — Administração</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>VoltOS — Relatório</title>
   <link rel="manifest" href="manifest.json" />
   <meta name="theme-color" content="#12161F" />
   <link rel="icon" href="icons/icon.svg" type="image/svg+xml" />
@@ -15,25 +15,27 @@
     <div class="topbar-right">
       <a href="painel.html" class="btn-ghost">← Painel</a>
       <a href="horas.html" class="btn-ghost">Horas</a>
-      <a href="relatorio.html" class="btn-ghost">Relatório</a>
+      <a href="admin.html" class="btn-ghost">Administração</a>
       <span id="nome-usuario"></span>
       <button class="btn-ghost" id="btn-sair">Sair</button>
     </div>
   </div>
 
   <div class="container">
-    <h2 style="margin-top:0">Administração</h2>
-    <div class="tabs" id="tabs-admin">
-      <button class="tab ativa" data-tab="colaboradores">Colaboradores</button>
-      <button class="tab" data-tab="equipamentos">Equipamentos</button>
-      <button class="tab" data-tab="motivos">Motivos</button>
-    </div>
-    <div id="conteudo-admin"></div>
+    <h2 style="margin-top:0">Relatório de O.S.</h2>
+
+    <div class="tabs" id="periodos"></div>
+
+    <form class="periodo-custom" id="form-periodo">
+      <div class="field"><label for="f-de">De</label><input id="f-de" type="date" /></div>
+      <div class="field"><label for="f-ate">Até</label><input id="f-ate" type="date" /></div>
+      <button type="submit" class="btn-secondary">Aplicar</button>
+    </form>
+
+    <div id="conteudo-relatorio"></div>
   </div>
 
-  <div id="modal-slot"></div>
-
-  <script type="module" src="js/admin.js"></script>
+  <script type="module" src="js/relatorio.js"></script>
   <script src="js/pwa.js"></script>
 </body>
 </html>

@@ -33,6 +33,7 @@ async function init() {
   if (perfil.papel === "gestor") {
     $("#chip-papel").classList.add("gestor");
     $("#link-admin").style.display = "inline-block";
+    $("#link-relatorio").style.display = "inline-block";
     $("#btn-minhas-os").style.display = "inline-block";
   }
 

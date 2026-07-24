@@ -304,6 +304,39 @@ label { font-size: 13px; color: var(--text-dim); font-weight: 500; display: bloc
 .stat-tile > small { font-size: 11px; color: var(--text-dim); }
 @media (max-width: 420px) { .tempos-stats { grid-template-columns: 1fr; } }
 
+/* -------------------- relatório -------------------- */
+.rel-resumo { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 14px; }
+.rel-resumo .stat-tile > strong { font-size: 24px; }
+@media (max-width: 640px) { .rel-resumo { grid-template-columns: 1fr; } }
+
+.rel-prioridades { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 6px; }
+.prio-chip {
+  display: flex; align-items: center; gap: 8px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 20px;
+  padding: 8px 14px; font-size: 13px;
+}
+.prio-chip .prio-nome { color: var(--text-dim); }
+.prio-chip strong { font-family: var(--font-mono); font-size: 16px; }
+.prio-chip.prio-normal { --led: var(--verde); }
+.prio-chip.prio-prioritaria { --led: var(--amarelo); }
+.prio-chip.prio-emergencial { --led: var(--vermelho); }
+
+.rel-tabela { border: 1px solid var(--border); border-radius: var(--radius); overflow-x: auto; }
+.rel-linha {
+  display: grid;
+  grid-template-columns: 64px minmax(140px, 1.6fr) 130px 130px 92px 110px;
+  gap: 10px; align-items: center;
+  padding: 11px 14px; border-bottom: 1px solid var(--border); font-size: 13px;
+  min-width: 640px;
+}
+.rel-linha:last-child { border-bottom: none; }
+.rel-cabecalho { color: var(--text-dim); font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; background: var(--surface-2); }
+.rel-num { text-align: right; }
+.rel-prio { display: flex; align-items: center; gap: 6px; --led: var(--verde); }
+.rel-prio.prio-prioritaria { --led: var(--amarelo); }
+.rel-prio.prio-emergencial { --led: var(--vermelho); }
+.rel-status { color: var(--text-dim); }
+
 /* -------------------- assinatura -------------------- */
 .sign-wrap { position: relative; }
 .sign-canvas {
