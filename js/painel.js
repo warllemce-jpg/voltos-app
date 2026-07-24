@@ -10,6 +10,7 @@ const RETENCAO_DIAS = 7;
 let perfil = null;
 let allOS = [];
 let temposOS = new Map(); // os_id -> { fechados: segundos, desde: ISO string | null }
+let horaHomemOS = new Map(); // os_id -> segundos somando todas as pessoas (hora-homem)
 let ajudantesPorOS = new Map(); // os_id -> [nomes] dos que estão ajudando agora
 let equipamentos = [];
 let motivosPausa = [];
@@ -46,7 +47,7 @@ async function init() {
 
   $("#lista-os").addEventListener("click", onListaClick);
 
-  await Promise.all([carregarLookups(), carregarOS(), carregarTempos(), carregarAjudanteAtivo(), carregarAjudantesPorOS()]);
+  await Promise.all([carregarLookups(), carregarOS(), carregarTempos(), carregarHoraHomem(), carregarAjudanteAtivo(), carregarAjudantesPorOS()]);
   render();
 
   // Contador de "tempo de trabalho" das O.S. em andamento sobe sozinho,
@@ -56,10 +57,10 @@ async function init() {
   // Realtime: qualquer mudança relevante recarrega a lista
   supabase.channel("voltos-realtime")
     .on("postgres_changes", { event: "*", schema: "public", table: "ordens_servico" }, async () => {
-      await Promise.all([carregarOS(), carregarTempos()]); render();
+      await Promise.all([carregarOS(), carregarTempos(), carregarHoraHomem()]); render();
     })
     .on("postgres_changes", { event: "*", schema: "public", table: "ajudante_ativo" }, async () => {
-      await Promise.all([carregarAjudanteAtivo(), carregarAjudantesPorOS()]); render();
+      await Promise.all([carregarAjudanteAtivo(), carregarAjudantesPorOS(), carregarHoraHomem()]); render();
     })
     .subscribe();
 }
@@ -100,6 +101,14 @@ async function carregarTempos() {
     t.os_id,
     { fechados: Number(t.segundos_fechados) || 0, desde: t.em_execucao_desde },
   ]));
+}
+
+async function carregarHoraHomem() {
+  const { data, error } = await supabase
+    .from("vw_horas_homem_os")
+    .select("os_id, segundos_homem");
+  if (error) { console.error(error); return; }
+  horaHomemOS = new Map((data || []).map(h => [h.os_id, Number(h.segundos_homem) || 0]));
 }
 
 async function carregarAjudantesPorOS() {
@@ -277,6 +286,7 @@ function osCardHtml(os) {
         ${ajudantesHtml(os)}
         ${os.tag ? `<span>Tag: ${escapeHtml(os.tag)}</span>` : ""}
         ${tempoOSHtml(os)}
+        ${horaHomemHtml(os)}
       </div>
       ${acoes ? `<div class="os-actions">${acoes}</div>` : ""}
     </div>`;
@@ -323,6 +333,16 @@ function tempoOSHtml(os) {
     ? ` data-fechados="${t.fechados}" data-desde="${t.desde}"`
     : "";
   return `<span class="os-tempo" data-os="${os.id}"${dataAttrs}>⏱ ${rotulo}${formatarDuracao(seg)} de trabalho</span>`;
+}
+
+// Hora-homem no card (só gestor): soma do esforço de todas as pessoas na
+// O.S. Ajuda a bater o olho e ver quais O.S. puxaram mais gente sem abrir
+// o modal. Enquanto o ⏱ (duração) mostra o relógio da O.S.
+function horaHomemHtml(os) {
+  if (perfil.papel !== "gestor" || os.status === "Aberta") return "";
+  const seg = horaHomemOS.get(os.id);
+  if (!seg) return "";
+  return `<span class="os-homem">👥 ${formatarDuracao(seg)} hora-homem</span>`;
 }
 
 // Atualiza só o texto dos contadores em andamento, sem re-renderizar a
@@ -645,14 +665,23 @@ function abrirModalMaterial(osId) {
 // tempo de cada um) + tempo total da O.S. (relógio).
 async function abrirModalTempos(osId) {
   const os = allOS.find(o => o.id === osId);
-  const total = os ? formatarDuracao(segundosDaOS(os)) : "—";
+  const duracao = os ? formatarDuracao(segundosDaOS(os)) : "—";
 
   abrirModal(`
     <div class="modal">
       <h2>Tempos — O.S. #${os?.numero ?? ""}</h2>
-      <div class="horas-total"><span>Tempo total da O.S.</span><strong class="mono">${total}</strong></div>
+      <div class="tempos-stats">
+        <div class="stat-tile">
+          <span>Duração</span><strong class="mono">${duracao}</strong>
+          <small>relógio da O.S., sem pausas</small>
+        </div>
+        <div class="stat-tile">
+          <span>Hora-homem</span><strong class="mono" id="stat-homem">—</strong>
+          <small>soma do esforço de cada pessoa</small>
+        </div>
+      </div>
       <div id="tempos-lista"><p class="carregando">Carregando...</p></div>
-      <p class="nota-horas">A soma por pessoa pode passar do total da O.S. quando executor e ajudante trabalham ao mesmo tempo — cada um conta o próprio esforço.</p>
+      <p class="nota-horas">A hora-homem passa da duração quando executor e ajudante trabalham ao mesmo tempo — cada um conta o próprio esforço. Razão alta = O.S. que exigiu mais gente.</p>
       <div class="modal-actions"><button type="button" class="btn-secondary" data-fechar>Fechar</button></div>
     </div>`);
 
@@ -660,6 +689,9 @@ async function abrirModalTempos(osId) {
   const lista = $("#tempos-lista");
   if (error) { lista.innerHTML = `<p class="error-msg" style="display:block">${escapeHtml(error.message)}</p>`; return; }
   if (!data || data.length === 0) { lista.innerHTML = `<p class="vazio">Ninguém trabalhou nesta O.S. ainda.</p>`; return; }
+
+  const totalHomem = data.reduce((soma, r) => soma + Number(r.segundos_trabalhados), 0);
+  $("#stat-homem").textContent = formatarDuracao(totalHomem);
 
   lista.innerHTML = data.map(r => `
     <div class="detalhe-linha">
