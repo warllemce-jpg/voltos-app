@@ -12,7 +12,8 @@ export function formatarDataCurta(iso) {
 }
 
 export function formatarDuracao(segundos) {
-  if (!segundos || segundos < 0) segundos = 0;
+  segundos = Number(segundos);
+  if (!Number.isFinite(segundos) || segundos < 0) segundos = 0;
   const h = Math.floor(segundos / 3600);
   const m = Math.floor((segundos % 3600) / 60);
   return `${h}h${String(m).padStart(2, "0")}`;
