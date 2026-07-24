@@ -135,7 +135,13 @@ function osParaTab(status) {
   if (status === "Aberta") {
     // todo mundo vê todas as abertas (qualquer um pode adotar)
   } else if (status === "Em andamento") {
-    if (souColaboradorOuMinhas) rows = rows.filter(os => os.executado_por === perfil.id);
+    // A equipe inteira precisa ver as O.S. em andamento dos outros pra
+    // poder entrar como ajudante (o botão "Ajudar" só aparece no card de
+    // uma O.S. em andamento de outra pessoa). Por isso o colaborador vê
+    // todas — só o gestor no modo "Minhas O.S." é que filtra pras dele.
+    if (perfil.papel === "gestor" && viewMode === "minhas") {
+      rows = rows.filter(os => os.executado_por === perfil.id);
+    }
   } else if (status === "Pausada") {
     // pausadas da equipe inteira sempre visíveis (para poder retomar)
   } else if (status === "Concluída" || status === "Cancelada") {
