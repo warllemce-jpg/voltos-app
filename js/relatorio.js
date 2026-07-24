@@ -171,7 +171,7 @@ function render() {
 function linhaHtml(l) {
   return `
     <div class="rel-linha">
-      <span class="mono">#${l.numero}</span>
+      <span class="mono">${escapeHtml(l.codigo || "#" + l.numero)}</span>
       <span>${escapeHtml(l.equipamento)}</span>
       <span class="rel-prio ${slugPrio(l.prioridade)}"><span class="led-prio"></span>${escapeHtml(l.prioridade)}</span>
       <span class="rel-status">${escapeHtml(l.status)}</span>

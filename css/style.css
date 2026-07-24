@@ -324,10 +324,10 @@ label { font-size: 13px; color: var(--text-dim); font-weight: 500; display: bloc
 .rel-tabela { border: 1px solid var(--border); border-radius: var(--radius); overflow-x: auto; }
 .rel-linha {
   display: grid;
-  grid-template-columns: 64px minmax(140px, 1.6fr) 130px 130px 92px 110px;
+  grid-template-columns: 104px minmax(130px, 1.5fr) 120px 120px 88px 104px;
   gap: 10px; align-items: center;
   padding: 11px 14px; border-bottom: 1px solid var(--border); font-size: 13px;
-  min-width: 640px;
+  min-width: 680px;
 }
 .rel-linha:last-child { border-bottom: none; }
 .rel-cabecalho { color: var(--text-dim); font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; background: var(--surface-2); }

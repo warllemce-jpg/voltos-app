@@ -130,7 +130,7 @@ async function carregarAjudantesPorOS() {
 async function carregarAjudanteAtivo() {
   const { data } = await supabase
     .from("ajudante_ativo")
-    .select("os_id, ordens_servico(numero, equipamentos(nome), equipamento_outro)")
+    .select("os_id, ordens_servico(numero, codigo, equipamentos(nome), equipamento_outro)")
     .eq("colaborador_id", perfil.id)
     .maybeSingle();
   ajudanteAtivo = data || null;
@@ -152,7 +152,7 @@ function renderBannerAjudante() {
   const equip = os?.equipamentos?.nome || os?.equipamento_outro || "—";
   slot.innerHTML = `
     <div class="banner-ajudante">
-      <span>🔧 Você está ajudando: <strong>O.S. #${os?.numero} — ${escapeHtml(equip)}</strong></span>
+      <span>🔧 Você está ajudando: <strong>O.S. ${escapeHtml(osLabel(os))} — ${escapeHtml(equip)}</strong></span>
       <button class="btn-ghost" data-action="sair-ajudante" data-os="${ajudanteAtivo.os_id}">Sair da ajuda</button>
     </div>`;
 }
@@ -274,7 +274,7 @@ function osCardHtml(os) {
     <div class="os-card ${slugPrio(os.prioridade)}">
       <div class="os-card-top">
         <div>
-          <div class="os-numero">O.S. #${os.numero}</div>
+          <div class="os-numero">O.S. ${escapeHtml(osLabel(os))}</div>
           <div class="os-equip">${escapeHtml(equip)}</div>
           <div class="os-setor">${escapeHtml(os.setor_solicitante)} · ${escapeHtml(os.tipo_servico)}${os.tipo_manutencao ? " · " + escapeHtml(os.tipo_manutencao) : ""}</div>
         </div>
@@ -295,6 +295,12 @@ function osCardHtml(os) {
 
 function botao(action, osId, label, classe) {
   return `<button class="${classe}" data-action="${action}" data-os="${osId}">${label}</button>`;
+}
+
+// Identificador da O.S. no padrão da empresa (ex.: 07/26-P04). O.S. muito
+// antigas, sem código, caem no #N interno como fallback.
+function osLabel(os) {
+  return os?.codigo || `#${os?.numero ?? ""}`;
 }
 
 // Nomes de quem está ajudando AGORA na O.S. (só faz sentido em andamento).
@@ -670,7 +676,7 @@ async function abrirModalTempos(osId) {
 
   abrirModal(`
     <div class="modal">
-      <h2>Tempos — O.S. #${os?.numero ?? ""}</h2>
+      <h2>Tempos — O.S. ${escapeHtml(osLabel(os))}</h2>
       <div class="tempos-stats">
         <div class="stat-tile">
           <span>Duração</span><strong class="mono">${duracao}</strong>
@@ -709,7 +715,7 @@ function abrirModalAssinatura(osId) {
   const os = allOS.find(o => o.id === osId);
   abrirModal(`
     <div class="modal">
-      <h2>Assinatura — O.S. #${os?.numero ?? ""}</h2>
+      <h2>Assinatura — O.S. ${escapeHtml(osLabel(os))}</h2>
       <form id="form-assinatura">
         <div class="field"><label>Nome do responsável</label>
           <input id="f-resp" type="text" required placeholder="Quem está assinando o recebimento" /></div>
@@ -754,7 +760,7 @@ async function abrirModalVerAssinatura(osId) {
   const os = allOS.find(o => o.id === osId);
   abrirModal(`
     <div class="modal">
-      <h2>Assinatura — O.S. #${os?.numero ?? ""}</h2>
+      <h2>Assinatura — O.S. ${escapeHtml(osLabel(os))}</h2>
       <div id="ver-assinatura"><p class="carregando">Carregando...</p></div>
       <div class="modal-actions"><button type="button" class="btn-secondary" data-fechar>Fechar</button></div>
     </div>`);
