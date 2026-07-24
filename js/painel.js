@@ -366,6 +366,21 @@ async function chamarRpc(nome, params, btnOrigem) {
   return true;
 }
 
+// Trava o botão de submit no primeiro envio, pra um duplo-clique não
+// inserir a mesma coisa duas vezes (já causou O.S. e cadastros duplicados).
+// Devolve { btn, ok }: ok=false quando já está enviando (aborta o handler).
+function travarEnvio(e) {
+  const btn = e.submitter || e.target.querySelector('button[type="submit"]');
+  if (!btn) return { btn: null, ok: true };
+  if (btn.dataset.enviando) return { btn, ok: false };
+  btn.dataset.enviando = "1";
+  btn.disabled = true;
+  return { btn, ok: true };
+}
+function destravarEnvio(btn) {
+  if (btn) { btn.disabled = false; delete btn.dataset.enviando; }
+}
+
 // delegação única também cobre o botão "Sair da ajuda" dentro do banner
 document.getElementById("banner-ajudante-slot").addEventListener("click", onListaClick);
 
@@ -453,6 +468,8 @@ function abrirModalNovaOS() {
 
   $("#form-nova-os").addEventListener("submit", async (e) => {
     e.preventDefault();
+    const { btn: btnEnvio, ok } = travarEnvio(e);
+    if (!ok) return; // já está inserindo — ignora clique repetido
     const equipVal = $("#f-equip").value;
     const prioridade = document.querySelector('input[name="prio"]:checked').value;
     const motivoEmergVal = $("#f-motivo-emerg").value;
@@ -473,7 +490,10 @@ function abrirModalNovaOS() {
     };
 
     const { error } = await supabase.from("ordens_servico").insert(payload);
-    if (error) { $("#erro-nova-os").textContent = error.message; $("#erro-nova-os").style.display = "block"; return; }
+    if (error) {
+      $("#erro-nova-os").textContent = error.message; $("#erro-nova-os").style.display = "block";
+      destravarEnvio(btnEnvio); return;
+    }
     fecharModal();
     await carregarOS(); abaAtiva = "Aberta"; render();
   });
@@ -608,10 +628,15 @@ function abrirModalMaterial(osId) {
 
   $("#form-material").addEventListener("submit", async (e) => {
     e.preventDefault();
+    const { btn: btnEnvio, ok } = travarEnvio(e);
+    if (!ok) return;
     const { error } = await supabase.rpc("registrar_material", {
       p_os_id: osId, p_nome: $("#f-mat-nome").value, p_quantidade: Number($("#f-mat-qtd").value),
     });
-    if (error) { $("#erro-material").textContent = error.message; $("#erro-material").style.display = "block"; return; }
+    if (error) {
+      $("#erro-material").textContent = error.message; $("#erro-material").style.display = "block";
+      destravarEnvio(btnEnvio); return;
+    }
     fecharModal();
   });
 }
