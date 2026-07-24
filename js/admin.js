@@ -86,8 +86,8 @@ function abrirModalNovoColaborador() {
       <h2>Novo colaborador</h2>
       <form id="form-novo-colab">
         <div class="field"><label>Nome completo</label><input id="f-nome" type="text" required /></div>
-        <div class="field"><label>PIN (4 dígitos)</label>
-          <input id="f-pin" class="pin-input" type="text" inputmode="numeric" pattern="\\d{4}" maxlength="4" required /></div>
+        <div class="field"><label>PIN (6 dígitos)</label>
+          <input id="f-pin" class="pin-input" type="text" inputmode="numeric" pattern="\\d{6}" maxlength="6" required /></div>
         <div class="field"><label>Papel</label>
           <select id="f-papel"><option value="colaborador">Colaborador</option><option value="gestor">Gestor</option></select></div>
         <div class="field"><label>Turno (opcional)</label>
@@ -131,8 +131,8 @@ function abrirModalResetarPin(colaboradorId, nome) {
     <div class="modal">
       <h2>Resetar PIN — ${escapeHtml(nome)}</h2>
       <form id="form-reset-pin">
-        <div class="field"><label>Novo PIN (4 dígitos)</label>
-          <input id="f-novo-pin" class="pin-input" type="text" inputmode="numeric" pattern="\\d{4}" maxlength="4" required /></div>
+        <div class="field"><label>Novo PIN (6 dígitos)</label>
+          <input id="f-novo-pin" class="pin-input" type="text" inputmode="numeric" pattern="\\d{6}" maxlength="6" required /></div>
         <p class="error-msg" id="erro-reset" style="display:none"></p>
         <div class="modal-actions">
           <button type="button" class="btn-secondary" data-fechar>Cancelar</button>
