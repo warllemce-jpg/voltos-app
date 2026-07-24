@@ -290,6 +290,20 @@ label { font-size: 13px; color: var(--text-dim); font-weight: 500; display: bloc
 
 .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 
+/* -------------------- assinatura -------------------- */
+.sign-wrap { position: relative; }
+.sign-canvas {
+  width: 100%; height: 160px; display: block;
+  background: #F4F6FA; border: 1px dashed var(--border); border-radius: var(--radius-sm);
+  touch-action: none; cursor: crosshair;
+}
+.sign-clear { position: absolute; top: 6px; right: 6px; background: rgba(255,255,255,0.75); color: #12161F; }
+.sign-clear:hover { background: #fff; color: #12161F; }
+.assinatura-view {
+  background: #FFFFFF; border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 8px;
+}
+.assinatura-view img { display: block; width: 100%; height: auto; }
+
 @media (max-width: 520px) {
   .grid-2 { grid-template-columns: 1fr; }
   .container { padding: 14px; }

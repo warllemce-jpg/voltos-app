@@ -1,7 +1,10 @@
 import { supabase, exigirSessao, sair } from "./supabaseClient.js";
 import { formatarDataCurta, formatarDuracao, diasDesde, slugPrio, escapeHtml } from "./utils.js";
 
-const STATUS_TABS = ["Aberta", "Em andamento", "Pausada", "Concluída", "Cancelada"];
+const STATUS_TABS = ["Aberta", "Em andamento", "Pausada", "Aguardando assinatura", "Concluída", "Cancelada"];
+// Rótulo curto na aba (o status "Aguardando assinatura" é longo demais pro
+// chip); o valor real continua sendo o status do banco.
+const STATUS_LABEL = { "Aguardando assinatura": "Assinatura" };
 const RETENCAO_DIAS = 7;
 
 let perfil = null;
@@ -151,7 +154,7 @@ function contarPorStatus(status) {
 function renderTabs() {
   $("#tabs").innerHTML = STATUS_TABS.map(status => `
     <button class="tab ${status === abaAtiva ? "ativa" : ""}" data-tab="${status}">
-      ${status} <span class="count">${contarPorStatus(status)}</span>
+      ${STATUS_LABEL[status] || status} <span class="count">${contarPorStatus(status)}</span>
     </button>
   `).join("");
   $("#tabs").querySelectorAll("[data-tab]").forEach(btn => {
@@ -176,6 +179,10 @@ function osParaTab(status) {
     }
   } else if (status === "Pausada") {
     // pausadas da equipe inteira sempre visíveis (para poder retomar)
+  } else if (status === "Aguardando assinatura") {
+    // Quem coleta a assinatura é quem executou; o colaborador vê só as
+    // que ele concluiu. Gestor vê todas (ou só as dele em "Minhas O.S.").
+    if (souColaboradorOuMinhas) rows = rows.filter(os => os.executado_por === perfil.id);
   } else if (status === "Concluída") {
     // Todos veem as concluídas da EQUIPE (transparência do tempo total).
     // O colaborador ainda com retenção de 7 dias pra não virar histórico
@@ -241,6 +248,14 @@ function osCardHtml(os) {
     if (souGestor) acoes += botao("cancelar", os.id, "Cancelar", "btn-danger");
   }
 
+  if (os.status === "Aguardando assinatura") {
+    if (souExecutor || souGestor) acoes += botao("assinar", os.id, "Coletar assinatura", "btn-primary");
+    if (souGestor) acoes += botao("cancelar", os.id, "Cancelar", "btn-danger");
+  }
+
+  // Ver a assinatura já coletada (só gestor, nas concluídas)
+  if (souGestor && os.status === "Concluída") acoes += botao("ver-assinatura", os.id, "Ver assinatura", "btn-ghost");
+
   // Gestor: detalhamento de tempo por pessoa em qualquer O.S. que já teve
   // trabalho (tudo menos "Aberta")
   if (souGestor && os.status !== "Aberta") acoes += botao("tempos", os.id, "Tempos", "btn-ghost");
@@ -300,7 +315,8 @@ function tempoOSHtml(os) {
   // Cancelada sem nenhum trabalho registrado: não polui o card.
   if (os.status === "Cancelada" && seg <= 0) return "";
 
-  const rotulo = os.status === "Concluída" ? "Levou " : "";
+  const trabalhoTerminou = os.status === "Concluída" || os.status === "Aguardando assinatura";
+  const rotulo = trabalhoTerminou ? "Levou " : "";
   // spans em andamento carregam os dados pro contador subir sozinho (tickTempos)
   const t = temposOS.get(os.id);
   const dataAttrs = (os.status === "Em andamento" && t?.desde)
@@ -338,6 +354,8 @@ async function onListaClick(e) {
   if (action === "cancelar") return abrirModalCancelar(osId);
   if (action === "material") return abrirModalMaterial(osId);
   if (action === "tempos") return abrirModalTempos(osId);
+  if (action === "assinar") return abrirModalAssinatura(osId);
+  if (action === "ver-assinatura") return abrirModalVerAssinatura(osId);
 }
 
 async function chamarRpc(nome, params, btnOrigem) {
@@ -542,7 +560,9 @@ function abrirModalConcluir(osId) {
       p_os_id: osId, p_manutencao_eficiente: eficiente, p_acao: eficiente ? null : $("#f-acao").value,
     });
     if (error) { $("#erro-concluir").textContent = error.message; $("#erro-concluir").style.display = "block"; return; }
-    fecharModal(); await carregarOS(); abaAtiva = "Concluída"; render();
+    fecharModal();
+    await Promise.all([carregarOS(), carregarTempos(), carregarAjudantesPorOS()]);
+    abaAtiva = "Aguardando assinatura"; render();
   });
 }
 
@@ -622,4 +642,139 @@ async function abrirModalTempos(osId) {
       <span class="detalhe-tag">${escapeHtml(r.papeis)}</span>
       <strong class="mono">${formatarDuracao(Number(r.segundos_trabalhados))}</strong>
     </div>`).join("");
+}
+
+// Coleta de assinatura: canvas assinável (dedo no celular / mouse no PC).
+// Ao confirmar, chama assinar_os, que grava a assinatura e move a O.S.
+// de "Aguardando assinatura" para "Concluída".
+function abrirModalAssinatura(osId) {
+  const os = allOS.find(o => o.id === osId);
+  abrirModal(`
+    <div class="modal">
+      <h2>Assinatura — O.S. #${os?.numero ?? ""}</h2>
+      <form id="form-assinatura">
+        <div class="field"><label>Nome do responsável</label>
+          <input id="f-resp" type="text" required placeholder="Quem está assinando o recebimento" /></div>
+        <div class="field">
+          <label>Assinatura</label>
+          <div class="sign-wrap">
+            <canvas id="sign-canvas" class="sign-canvas"></canvas>
+            <button type="button" class="btn-ghost sign-clear" id="btn-limpar-sign">Limpar</button>
+          </div>
+        </div>
+        <p class="error-msg" id="erro-assinatura" style="display:none"></p>
+        <div class="modal-actions">
+          <button type="button" class="btn-secondary" data-fechar>Cancelar</button>
+          <button type="submit" class="btn-primary">Confirmar e concluir</button>
+        </div>
+      </form>
+    </div>`);
+
+  const canvas = $("#sign-canvas");
+  const pad = criarSignaturePad(canvas);
+  $("#btn-limpar-sign").addEventListener("click", () => pad.limpar());
+
+  $("#form-assinatura").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const erro = $("#erro-assinatura");
+    const nome = $("#f-resp").value.trim();
+    if (!nome) { erro.textContent = "Informe o nome do responsável."; erro.style.display = "block"; return; }
+    if (pad.vazio()) { erro.textContent = "A assinatura está em branco."; erro.style.display = "block"; return; }
+
+    const btn = e.submitter; if (btn) btn.disabled = true;
+    const { error } = await supabase.rpc("assinar_os", {
+      p_os_id: osId, p_nome_responsavel: nome, p_assinatura_png: pad.dataUrl(),
+    });
+    if (error) { erro.textContent = error.message; erro.style.display = "block"; if (btn) btn.disabled = false; return; }
+    fecharModal();
+    await Promise.all([carregarOS(), carregarTempos()]);
+    abaAtiva = "Concluída"; render();
+  });
+}
+
+async function abrirModalVerAssinatura(osId) {
+  const os = allOS.find(o => o.id === osId);
+  abrirModal(`
+    <div class="modal">
+      <h2>Assinatura — O.S. #${os?.numero ?? ""}</h2>
+      <div id="ver-assinatura"><p class="carregando">Carregando...</p></div>
+      <div class="modal-actions"><button type="button" class="btn-secondary" data-fechar>Fechar</button></div>
+    </div>`);
+
+  const { data, error } = await supabase
+    .from("assinaturas")
+    .select("nome_responsavel, assinatura_png, coletado_em, coletor:perfis!assinaturas_coletado_por_fkey(nome)")
+    .eq("os_id", osId)
+    .order("coletado_em", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const alvo = $("#ver-assinatura");
+  if (error) { alvo.innerHTML = `<p class="error-msg" style="display:block">${escapeHtml(error.message)}</p>`; return; }
+  if (!data) { alvo.innerHTML = `<p class="vazio">Nenhuma assinatura registrada nesta O.S.</p>`; return; }
+
+  alvo.innerHTML = `
+    <div class="assinatura-view">
+      <img src="${data.assinatura_png}" alt="Assinatura de ${escapeHtml(data.nome_responsavel)}" />
+    </div>
+    <div class="os-meta" style="margin-top:12px">
+      <span>Responsável: ${escapeHtml(data.nome_responsavel)}</span>
+      <span>Coletada por ${escapeHtml(data.coletor?.nome || "—")} em ${formatarDataCurta(data.coletado_em)}</span>
+    </div>`;
+}
+
+// Signature pad minimalista sobre <canvas>, com Pointer Events (funciona
+// pra mouse e toque). Ajusta a resolução ao devicePixelRatio pra não
+// ficar borrado, e trava o scroll da página durante o traço.
+function criarSignaturePad(canvas) {
+  const ctx = canvas.getContext("2d");
+  let desenhando = false, temTraco = false, ultimo = null;
+
+  function ajustarTamanho() {
+    const ratio = window.devicePixelRatio || 1;
+    const larguraCss = canvas.clientWidth || 400;
+    const alturaCss = 160;
+    canvas.width = larguraCss * ratio;
+    canvas.height = alturaCss * ratio;
+    canvas.style.height = alturaCss + "px";
+    ctx.scale(ratio, ratio);
+    ctx.lineWidth = 2.2;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.strokeStyle = "#12161F"; // traço escuro sobre fundo claro do canvas
+  }
+  // espera o layout do modal fechar pra medir a largura real
+  requestAnimationFrame(ajustarTamanho);
+
+  const pos = (e) => {
+    const r = canvas.getBoundingClientRect();
+    return { x: e.clientX - r.left, y: e.clientY - r.top };
+  };
+  const inicio = (e) => { desenhando = true; ultimo = pos(e); canvas.setPointerCapture(e.pointerId); e.preventDefault(); };
+  const mover = (e) => {
+    if (!desenhando) return;
+    const p = pos(e);
+    ctx.beginPath(); ctx.moveTo(ultimo.x, ultimo.y); ctx.lineTo(p.x, p.y); ctx.stroke();
+    ultimo = p; temTraco = true; e.preventDefault();
+  };
+  const fim = () => { desenhando = false; };
+
+  canvas.addEventListener("pointerdown", inicio);
+  canvas.addEventListener("pointermove", mover);
+  canvas.addEventListener("pointerup", fim);
+  canvas.addEventListener("pointercancel", fim);
+
+  return {
+    limpar() { ctx.clearRect(0, 0, canvas.width, canvas.height); temTraco = false; },
+    vazio() { return !temTraco; },
+    dataUrl() {
+      // fundo branco pra assinatura não sair transparente no PNG
+      const fundo = document.createElement("canvas");
+      fundo.width = canvas.width; fundo.height = canvas.height;
+      const fctx = fundo.getContext("2d");
+      fctx.fillStyle = "#FFFFFF"; fctx.fillRect(0, 0, fundo.width, fundo.height);
+      fctx.drawImage(canvas, 0, 0);
+      return fundo.toDataURL("image/png");
+    },
+  };
 }
