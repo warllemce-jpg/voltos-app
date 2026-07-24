@@ -6,6 +6,7 @@ const RETENCAO_DIAS = 7;
 
 let perfil = null;
 let allOS = [];
+let temposOS = new Map(); // os_id -> { fechados: segundos, desde: ISO string | null }
 let equipamentos = [];
 let motivosPausa = [];
 let motivosEmergencia = [];
@@ -41,13 +42,17 @@ async function init() {
 
   $("#lista-os").addEventListener("click", onListaClick);
 
-  await Promise.all([carregarLookups(), carregarOS(), carregarAjudanteAtivo()]);
+  await Promise.all([carregarLookups(), carregarOS(), carregarTempos(), carregarAjudanteAtivo()]);
   render();
+
+  // Contador de "tempo de trabalho" das O.S. em andamento sobe sozinho,
+  // sem bater no banco: atualiza só o texto dos spans a cada 30s.
+  setInterval(tickTempos, 30000);
 
   // Realtime: qualquer mudança relevante recarrega a lista
   supabase.channel("voltos-realtime")
     .on("postgres_changes", { event: "*", schema: "public", table: "ordens_servico" }, async () => {
-      await carregarOS(); render();
+      await Promise.all([carregarOS(), carregarTempos()]); render();
     })
     .on("postgres_changes", { event: "*", schema: "public", table: "ajudante_ativo" }, async () => {
       await carregarAjudanteAtivo(); render();
@@ -80,6 +85,17 @@ async function carregarOS() {
 
   if (error) { console.error(error); return; }
   allOS = data || [];
+}
+
+async function carregarTempos() {
+  const { data, error } = await supabase
+    .from("vw_tempo_execucao_os")
+    .select("os_id, segundos_fechados, em_execucao_desde");
+  if (error) { console.error(error); return; }
+  temposOS = new Map((data || []).map(t => [
+    t.os_id,
+    { fechados: Number(t.segundos_fechados) || 0, desde: t.em_execucao_desde },
+  ]));
 }
 
 async function carregarAjudanteAtivo() {
@@ -215,6 +231,7 @@ function osCardHtml(os) {
         <span>Aberta por ${escapeHtml(os.criador?.nome || "—")} em ${formatarDataCurta(os.criada_em)}</span>
         ${os.executor ? `<span>Executando: ${escapeHtml(os.executor.nome)}</span>` : ""}
         ${os.tag ? `<span>Tag: ${escapeHtml(os.tag)}</span>` : ""}
+        ${tempoOSHtml(os)}
       </div>
       ${acoes ? `<div class="os-actions">${acoes}</div>` : ""}
     </div>`;
@@ -222,6 +239,46 @@ function osCardHtml(os) {
 
 function botao(action, osId, label, classe) {
   return `<button class="${classe}" data-action="${action}" data-os="${osId}">${label}</button>`;
+}
+
+// Tempo de trabalho ATIVO da O.S. (descontando pausas). Para uma O.S. em
+// execução, soma o intervalo aberto (agora - em_execucao_desde) por cima
+// do que já fechou; para as demais, usa só o tempo fechado (congelado).
+function segundosDaOS(os) {
+  const t = temposOS.get(os.id);
+  if (!t) return 0;
+  const emAndamento = os.status === "Em andamento" && t.desde;
+  const extra = emAndamento ? (Date.now() - new Date(t.desde).getTime()) / 1000 : 0;
+  return t.fechados + Math.max(0, extra);
+}
+
+function tempoOSHtml(os) {
+  // Aberta nunca teve trabalho; sem dado de tempo, também não mostra nada
+  // (ex.: antes de rodar o 08_tempo_os.sql, a view não existe e a lista
+  // vem vazia — melhor não exibir "0h00" enganoso).
+  if (os.status === "Aberta" || !temposOS.has(os.id)) return "";
+  const seg = segundosDaOS(os);
+  // Cancelada sem nenhum trabalho registrado: não polui o card.
+  if (os.status === "Cancelada" && seg <= 0) return "";
+
+  const rotulo = os.status === "Concluída" ? "Levou " : "";
+  // spans em andamento carregam os dados pro contador subir sozinho (tickTempos)
+  const t = temposOS.get(os.id);
+  const dataAttrs = (os.status === "Em andamento" && t?.desde)
+    ? ` data-fechados="${t.fechados}" data-desde="${t.desde}"`
+    : "";
+  return `<span class="os-tempo" data-os="${os.id}"${dataAttrs}>⏱ ${rotulo}${formatarDuracao(seg)} de trabalho</span>`;
+}
+
+// Atualiza só o texto dos contadores em andamento, sem re-renderizar a
+// lista (não interfere em modais nem em cliques em andamento).
+function tickTempos() {
+  document.querySelectorAll(".os-tempo[data-desde]").forEach(span => {
+    const fechados = Number(span.dataset.fechados) || 0;
+    const desde = new Date(span.dataset.desde).getTime();
+    const seg = fechados + Math.max(0, (Date.now() - desde) / 1000);
+    span.textContent = `⏱ ${formatarDuracao(seg)} de trabalho`;
+  });
 }
 
 // ---------------------------------------------------------------------
