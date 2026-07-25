@@ -28,6 +28,7 @@ async function init() {
   if (perfil.papel === "gestor") {
     $("#link-relatorio").style.display = "inline-block";
     $("#link-validacao").style.display = "inline-block";
+    $("#link-indicadores").style.display = "inline-block";
   }
   if (perfil.papel !== "gestor") $("#titulo-horas").textContent = "Minhas horas";
 
