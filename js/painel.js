@@ -34,6 +34,7 @@ async function init() {
     $("#chip-papel").classList.add("gestor");
     $("#link-admin").style.display = "inline-block";
     $("#link-relatorio").style.display = "inline-block";
+    $("#link-validacao").style.display = "inline-block";
     $("#btn-minhas-os").style.display = "inline-block";
   }
 
@@ -286,6 +287,7 @@ function osCardHtml(os) {
         ${os.executor ? `<span>Executando: ${escapeHtml(os.executor.nome)}</span>` : ""}
         ${ajudantesHtml(os)}
         ${os.tag ? `<span>Tag: ${escapeHtml(os.tag)}</span>` : ""}
+        ${os.chave ? `<span class="os-chave">🔑 ${escapeHtml(os.chave)}</span>` : ""}
         ${tempoOSHtml(os)}
         ${horaHomemHtml(os)}
       </div>

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>VoltOS — Horas trabalhadas</title>
+  <title>VoltOS — Validação</title>
   <link rel="manifest" href="manifest.json" />
   <meta name="theme-color" content="#12161F" />
   <link rel="icon" href="icons/icon.svg" type="image/svg+xml" />
@@ -14,28 +14,27 @@
     <div class="brand"><span class="bolt">⚡</span> VoltOS</div>
     <div class="topbar-right">
       <a href="painel.html" class="btn-ghost">← Painel</a>
-      <a href="validacao.html" class="btn-ghost" id="link-validacao" style="display:none">Validação</a>
-      <a href="relatorio.html" class="btn-ghost" id="link-relatorio" style="display:none">Relatório</a>
       <span id="nome-usuario"></span>
       <button class="btn-ghost" id="btn-sair">Sair</button>
     </div>
   </div>
 
   <div class="container">
-    <h2 style="margin-top:0" id="titulo-horas">Horas trabalhadas</h2>
+    <h2 style="margin-top:0">Validação</h2>
+    <p class="val-ajuda">
+      Preencha a <strong>chave</strong> que o sistema primário gerou para cada O.S. (só números,
+      mínimo 10 dígitos). A lista atualiza sozinha a cada 30 segundos.
+    </p>
 
-    <div class="tabs" id="periodos"></div>
+    <div class="tabs" id="tabs-val">
+      <button class="tab ativa" data-modo="pendentes">Pendentes</button>
+      <button class="tab" data-modo="validadas">Já validadas</button>
+    </div>
 
-    <form class="periodo-custom" id="form-periodo">
-      <div class="field"><label for="f-de">De</label><input id="f-de" type="date" /></div>
-      <div class="field"><label for="f-ate">Até</label><input id="f-ate" type="date" /></div>
-      <button type="submit" class="btn-secondary">Aplicar</button>
-    </form>
-
-    <div id="conteudo-horas"></div>
+    <div id="lista-validacao"></div>
   </div>
 
-  <script type="module" src="js/horas.js"></script>
+  <script type="module" src="js/validacao.js"></script>
   <script src="js/pwa.js"></script>
 </body>
 </html>
