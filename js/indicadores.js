@@ -16,6 +16,23 @@ const PERIODOS = [
   { id: "tudo", label: "Tudo" },
 ];
 
+// Explicações em linguagem simples (o ⓘ de cada indicador)
+const INFO = {
+  mttr: "Tempo médio para resolver uma O.S., do início ao fim, descontando as pausas. Quanto menor, mais rápido a equipe conclui os serviços.",
+  resposta: "Tempo médio entre abrir a O.S. e alguém começar a trabalhar nela. Mede a agilidade no atendimento.",
+  eficiencia: "Percentual das O.S. concluídas em que a manutenção resolveu de primeira, sem precisar refazer. Quanto maior, melhor a qualidade.",
+  prevcorr: "Quantas manutenções preventivas para cada corretiva. Acima de 1 significa mais prevenção do que conserto de urgência — situação saudável.",
+  mix: "Distribuição das O.S. de manutenção abertas no período: Preventiva (planejada), Corretiva (conserto) e Preditiva (por monitoramento).",
+  pausas: "Por que as O.S. ficaram paradas e quanto tempo se perdeu em cada motivo. Ajuda a atacar gargalos, como falta de material.",
+  backlog: "O.S. ainda não concluídas neste momento e há quanto tempo estão em aberto. Backlog grande ou antigo indica acúmulo de serviço.",
+};
+
+function infoIcon(key) {
+  const txt = INFO[key];
+  if (!txt) return "";
+  return `<span class="info-wrap"><button type="button" class="info-i" aria-label="O que significa este indicador?">i</button><span class="info-tip">${escapeHtml(txt)}</span></span>`;
+}
+
 init();
 
 async function init() {
@@ -44,6 +61,20 @@ async function init() {
     periodoAtivo = "custom";
     janela = { de, ate };
     carregar();
+  });
+
+  // ⓘ: no PC abre no hover (CSS); no celular, toque abre/fecha.
+  $("#conteudo-indicadores").addEventListener("click", (e) => {
+    const btn = e.target.closest(".info-i");
+    if (!btn) return;
+    e.stopPropagation();
+    const wrap = btn.parentElement;
+    const vaiAbrir = !wrap.classList.contains("aberto");
+    document.querySelectorAll(".info-wrap.aberto").forEach(w => w.classList.remove("aberto"));
+    if (vaiAbrir) wrap.classList.add("aberto");
+  });
+  document.addEventListener("click", () => {
+    document.querySelectorAll(".info-wrap.aberto").forEach(w => w.classList.remove("aberto"));
   });
 
   janela = janelaDoPreset(periodoAtivo);
@@ -133,13 +164,13 @@ function render() {
   $("#conteudo-indicadores").innerHTML = `
     <div class="ind-kpis">
       ${tile("MTTR", mttr.concluidas ? fmtDur(mttr.media_seg) : "—",
-             `duração média · ${mttr.concluidas || 0} concluída(s)`, "cyan")}
+             `duração média · ${mttr.concluidas || 0} concluída(s)`, "cyan", "mttr")}
       ${tile("Tempo de resposta", resp.iniciadas ? fmtDur(resp.media_seg) : "—",
-             `abertura → início · ${resp.iniciadas || 0} O.S.`, "cyan")}
+             `abertura → início · ${resp.iniciadas || 0} O.S.`, "cyan", "resposta")}
       ${tile("Manutenção eficiente", efPct === null ? "—" : efPct + "%",
-             `${ef.eficientes || 0} de ${ef.total || 0} concluídas`, "verde")}
+             `${ef.eficientes || 0} de ${ef.total || 0} concluídas`, "verde", "eficiencia")}
       ${tile("Preventiva ÷ Corretiva", corr ? (prev / corr).toFixed(2) : (prev ? "∞" : "—"),
-             `${prev} prev. · ${corr} corr. · ${pred} pred.`, "accent")}
+             `${prev} prev. · ${corr} corr. · ${pred} pred.`, "accent", "prevcorr")}
     </div>
 
     ${mixHtml(prev, corr, pred)}
@@ -152,10 +183,10 @@ function render() {
     </p>`;
 }
 
-function tile(titulo, valor, sub, cor) {
+function tile(titulo, valor, sub, cor, infoKey) {
   return `
     <div class="stat-tile">
-      <span>${escapeHtml(titulo)}</span>
+      <span class="tile-titulo">${escapeHtml(titulo)}${infoIcon(infoKey)}</span>
       <strong class="mono" style="color:var(--${cor})">${escapeHtml(valor)}</strong>
       <small>${escapeHtml(sub)}</small>
     </div>`;
@@ -167,7 +198,7 @@ function mixHtml(prev, corr, pred) {
   const seg = (n, cls) => n ? `<span class="mix-seg ${cls}" style="flex:${n}" title="${n}"></span>` : "";
   return `
     <div class="ind-bloco">
-      <h3>Tipo de manutenção (abertas no período)</h3>
+      <h3>Tipo de manutenção (abertas no período) ${infoIcon("mix")}</h3>
       <div class="mix-bar">
         ${seg(prev, "mix-prev")}${seg(corr, "mix-corr")}${seg(pred, "mix-pred")}
       </div>
@@ -186,12 +217,12 @@ function pausasHtml(pausas, acoes) {
     : "";
 
   if (pausas.length === 0) {
-    return `<div class="ind-bloco"><h3>Motivos de pausa</h3><p class="vazio">Nenhuma pausa no período.</p>${acoesLinha}</div>`;
+    return `<div class="ind-bloco"><h3>Motivos de pausa ${infoIcon("pausas")}</h3><p class="vazio">Nenhuma pausa no período.</p>${acoesLinha}</div>`;
   }
   const maiorSeg = Math.max(...pausas.map(p => Number(p.seg)), 1);
   return `
     <div class="ind-bloco">
-      <h3>Motivos de pausa (tempo perdido)</h3>
+      <h3>Motivos de pausa (tempo perdido) ${infoIcon("pausas")}</h3>
       ${pausas.map(p => {
         const largura = Math.round((Number(p.seg) / maiorSeg) * 100);
         return `
@@ -213,7 +244,7 @@ function backlogHtml(b) {
   const statusChips = Object.entries(status).map(([s, n]) => `<span class="chip-status">${escapeHtml(s)} ${n}</span>`).join("");
   return `
     <div class="ind-bloco">
-      <h3>Backlog agora <span class="ind-sub">(O.S. não concluídas)</span></h3>
+      <h3>Backlog agora <span class="ind-sub">(O.S. não concluídas)</span> ${infoIcon("backlog")}</h3>
       <div class="backlog-topo">
         <div class="backlog-total"><strong class="mono">${b.total || 0}</strong><span>em aberto</span></div>
         <div class="backlog-chips">${statusChips || '<span class="vazio">nada em aberto</span>'}</div>
