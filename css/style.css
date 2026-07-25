@@ -456,6 +456,12 @@ label { font-size: 13px; color: var(--text-dim); font-weight: 500; display: bloc
   background: #FFFFFF; border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 8px;
 }
 .assinatura-view img { display: block; width: 100%; height: auto; }
+.assinatura-bloco { margin-bottom: 16px; }
+.assinatura-bloco:last-child { margin-bottom: 0; }
+.assinatura-papel { font-size: 12px; font-weight: 600; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 6px; }
+
+.ass-ok { color: var(--verde); font-weight: 600; }
+.ass-pend { color: var(--amarelo); }
 
 @media (max-width: 520px) {
   .grid-2 { grid-template-columns: 1fr; }

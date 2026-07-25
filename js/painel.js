@@ -12,6 +12,8 @@ let allOS = [];
 let temposOS = new Map(); // os_id -> { fechados: segundos, desde: ISO string | null }
 let horaHomemOS = new Map(); // os_id -> segundos somando todas as pessoas (hora-homem)
 let ajudantesPorOS = new Map(); // os_id -> [nomes] dos que estão ajudando agora
+let assinaturasPorOS = new Map(); // os_id -> { inspetor?: nome, supervisor?: nome }
+let riscoPorOS = new Map(); // os_id -> boolean (risco de contaminação; define se exige inspetor)
 let equipamentos = [];
 let motivosPausa = [];
 let motivosEmergencia = [];
@@ -50,7 +52,7 @@ async function init() {
 
   $("#lista-os").addEventListener("click", onListaClick);
 
-  await Promise.all([carregarLookups(), carregarOS(), carregarTempos(), carregarHoraHomem(), carregarAjudanteAtivo(), carregarAjudantesPorOS()]);
+  await Promise.all([carregarLookups(), carregarOS(), carregarTempos(), carregarHoraHomem(), carregarAjudanteAtivo(), carregarAjudantesPorOS(), carregarAssinaturas(), carregarRiscoContam()]);
   render();
 
   // Contador de "tempo de trabalho" das O.S. em andamento sobe sozinho,
@@ -60,10 +62,13 @@ async function init() {
   // Realtime: qualquer mudança relevante recarrega a lista
   supabase.channel("voltos-realtime")
     .on("postgres_changes", { event: "*", schema: "public", table: "ordens_servico" }, async () => {
-      await Promise.all([carregarOS(), carregarTempos(), carregarHoraHomem()]); render();
+      await Promise.all([carregarOS(), carregarTempos(), carregarHoraHomem(), carregarRiscoContam()]); render();
     })
     .on("postgres_changes", { event: "*", schema: "public", table: "ajudante_ativo" }, async () => {
       await Promise.all([carregarAjudanteAtivo(), carregarAjudantesPorOS(), carregarHoraHomem()]); render();
+    })
+    .on("postgres_changes", { event: "*", schema: "public", table: "assinaturas" }, async () => {
+      await carregarAssinaturas(); render();
     })
     .subscribe();
 }
@@ -104,6 +109,32 @@ async function carregarTempos() {
     t.os_id,
     { fechados: Number(t.segundos_fechados) || 0, desde: t.em_execucao_desde },
   ]));
+}
+
+async function carregarAssinaturas() {
+  // assinaturas com papel das O.S. aguardando assinatura (pra mostrar o
+  // progresso Inspetor/Supervisor e o que ainda falta)
+  const { data, error } = await supabase
+    .from("assinaturas")
+    .select("os_id, papel, nome_responsavel")
+    .not("papel", "is", null);
+  if (error) { console.error(error); return; }
+  const mapa = new Map();
+  (data || []).forEach(a => {
+    if (!mapa.has(a.os_id)) mapa.set(a.os_id, {});
+    mapa.get(a.os_id)[a.papel] = a.nome_responsavel;
+  });
+  assinaturasPorOS = mapa;
+}
+
+async function carregarRiscoContam() {
+  // risco de contaminação por O.S. (define se a O.S. exige a assinatura
+  // do inspetor, além da do supervisor)
+  const { data, error } = await supabase
+    .from("checklist_qualidade")
+    .select("os_id, risco_contaminacao");
+  if (error) { console.error(error); return; }
+  riscoPorOS = new Map((data || []).map(c => [c.os_id, c.risco_contaminacao === true]));
 }
 
 async function carregarHoraHomem() {
@@ -261,7 +292,14 @@ function osCardHtml(os) {
   }
 
   if (os.status === "Aguardando assinatura") {
-    if (souExecutor || souGestor) acoes += botao("assinar", os.id, "Coletar assinatura", "btn-primary");
+    if (souExecutor || souGestor) {
+      const ass = assinaturasPorOS.get(os.id) || {};
+      // Inspetor só quando há risco de contaminação; Supervisor sempre.
+      if (riscoPorOS.get(os.id) === true) {
+        acoes += botao("assinar-inspetor", os.id, ass.inspetor ? "Inspetor ✓" : "Assinar inspetor", ass.inspetor ? "btn-ghost" : "btn-primary");
+      }
+      acoes += botao("assinar-supervisor", os.id, ass.supervisor ? "Supervisor ✓" : "Assinar supervisor", ass.supervisor ? "btn-ghost" : "btn-primary");
+    }
     if (souGestor) acoes += botao("cancelar", os.id, "Cancelar", "btn-danger");
   }
 
@@ -289,6 +327,7 @@ function osCardHtml(os) {
         ${ajudantesHtml(os)}
         ${os.tag ? `<span>Tag: ${escapeHtml(os.tag)}</span>` : ""}
         ${os.chave ? `<span class="os-chave">🔑 ${escapeHtml(os.chave)}</span>` : ""}
+        ${assinaturasHtml(os)}
         ${tempoOSHtml(os)}
         ${horaHomemHtml(os)}
       </div>
@@ -313,6 +352,19 @@ function ajudantesHtml(os) {
   const nomes = ajudantesPorOS.get(os.id) || [];
   if (nomes.length === 0) return "";
   return `<span>Ajudando: ${nomes.map(escapeHtml).join(", ")}</span>`;
+}
+
+// Progresso das duas assinaturas (só na aba "Aguardando assinatura").
+function assinaturasHtml(os) {
+  if (os.status !== "Aguardando assinatura") return "";
+  const ass = assinaturasPorOS.get(os.id) || {};
+  const item = (rotulo, nome) => nome
+    ? `${rotulo}: <span class="ass-ok">✓ ${escapeHtml(nome)}</span>`
+    : `${rotulo}: <span class="ass-pend">pendente</span>`;
+  const partes = [];
+  if (riscoPorOS.get(os.id) === true) partes.push(item("Inspetor", ass.inspetor));
+  partes.push(item("Supervisor", ass.supervisor));
+  return `<span>✍ ${partes.join(" · ")}</span>`;
 }
 
 // Tempo de trabalho ATIVO da O.S. (descontando pausas). Para uma O.S. em
@@ -384,7 +436,8 @@ async function onListaClick(e) {
   if (action === "cancelar") return abrirModalCancelar(osId);
   if (action === "material") return abrirModalMaterial(osId);
   if (action === "tempos") return abrirModalTempos(osId);
-  if (action === "assinar") return abrirModalAssinatura(osId);
+  if (action === "assinar-inspetor") return abrirModalAssinatura(osId, "inspetor");
+  if (action === "assinar-supervisor") return abrirModalAssinatura(osId, "supervisor");
   if (action === "ver-assinatura") return abrirModalVerAssinatura(osId);
 }
 
@@ -577,6 +630,9 @@ function abrirModalConcluir(osId) {
     <div class="modal">
       <h2>Concluir O.S.</h2>
       <form id="form-concluir">
+        <div class="field"><label>Serviços realizados</label>
+          <textarea id="f-servicos" rows="3" required placeholder="O que foi de fato executado no serviço"></textarea></div>
+
         <div class="field"><label>A manutenção foi eficiente?</label>
           <div class="radio-group">
             <label class="radio-option"><input type="radio" name="eficiente" value="sim" checked /> Sim</label>
@@ -608,6 +664,9 @@ function abrirModalConcluir(osId) {
           </div>
         </div>
 
+        <div class="field"><label>Observações (opcional)</label>
+          <textarea id="f-observacoes" rows="2" placeholder="Observações adicionais"></textarea></div>
+
         <p class="error-msg" id="erro-concluir" style="display:none"></p>
         <div class="modal-actions">
           <button type="button" class="btn-secondary" data-fechar>Cancelar</button>
@@ -627,6 +686,9 @@ function abrirModalConcluir(osId) {
     e.preventDefault();
     const eficiente = document.querySelector('input[name="eficiente"]:checked').value === "sim";
     const risco = document.querySelector('input[name="risco"]:checked').value === "sim";
+    const erro = $("#erro-concluir");
+    const servicos = $("#f-servicos").value.trim();
+    if (!servicos) { erro.textContent = "Descreva os serviços realizados."; erro.style.display = "block"; return; }
     const { error } = await supabase.rpc("concluir_os", {
       p_os_id: osId,
       p_manutencao_eficiente: eficiente,
@@ -636,8 +698,10 @@ function abrirModalConcluir(osId) {
       p_area_limpa: risco ? $("#c-area").checked : null,
       p_ausencia_objetos_estranhos: risco ? $("#c-objetos").checked : null,
       p_equipamento_liberado: risco ? $("#c-liberado").checked : null,
+      p_servicos_realizados: servicos,
+      p_observacoes: $("#f-observacoes").value,
     });
-    if (error) { $("#erro-concluir").textContent = error.message; $("#erro-concluir").style.display = "block"; return; }
+    if (error) { erro.textContent = error.message; erro.style.display = "block"; return; }
     fecharModal();
     await Promise.all([carregarOS(), carregarTempos(), carregarAjudantesPorOS()]);
     abaAtiva = "Aguardando assinatura"; render();
@@ -742,14 +806,15 @@ async function abrirModalTempos(osId) {
 // Coleta de assinatura: canvas assinável (dedo no celular / mouse no PC).
 // Ao confirmar, chama assinar_os, que grava a assinatura e move a O.S.
 // de "Aguardando assinatura" para "Concluída".
-function abrirModalAssinatura(osId) {
+function abrirModalAssinatura(osId, papel) {
   const os = allOS.find(o => o.id === osId);
+  const titulo = papel === "inspetor" ? "Inspetor" : "Supervisor de Manutenção";
   abrirModal(`
     <div class="modal">
-      <h2>Assinatura — O.S. ${escapeHtml(osLabel(os))}</h2>
+      <h2>Assinatura do ${titulo} — O.S. ${escapeHtml(osLabel(os))}</h2>
       <form id="form-assinatura">
-        <div class="field"><label>Nome do responsável</label>
-          <input id="f-resp" type="text" required placeholder="Quem está assinando o recebimento" /></div>
+        <div class="field"><label>Nome de quem está assinando</label>
+          <input id="f-resp" type="text" required placeholder="Nome completo do ${titulo.toLowerCase()}" /></div>
         <div class="field">
           <label>Assinatura</label>
           <div class="sign-wrap">
@@ -760,7 +825,7 @@ function abrirModalAssinatura(osId) {
         <p class="error-msg" id="erro-assinatura" style="display:none"></p>
         <div class="modal-actions">
           <button type="button" class="btn-secondary" data-fechar>Cancelar</button>
-          <button type="submit" class="btn-primary">Confirmar e concluir</button>
+          <button type="submit" class="btn-primary">Confirmar assinatura</button>
         </div>
       </form>
     </div>`);
@@ -773,17 +838,20 @@ function abrirModalAssinatura(osId) {
     e.preventDefault();
     const erro = $("#erro-assinatura");
     const nome = $("#f-resp").value.trim();
-    if (!nome) { erro.textContent = "Informe o nome do responsável."; erro.style.display = "block"; return; }
+    if (!nome) { erro.textContent = "Informe o nome de quem está assinando."; erro.style.display = "block"; return; }
     if (pad.vazio()) { erro.textContent = "A assinatura está em branco."; erro.style.display = "block"; return; }
 
     const btn = e.submitter; if (btn) btn.disabled = true;
     const { error } = await supabase.rpc("assinar_os", {
-      p_os_id: osId, p_nome_responsavel: nome, p_assinatura_png: pad.dataUrl(),
+      p_os_id: osId, p_papel: papel, p_nome_responsavel: nome, p_assinatura_png: pad.dataUrl(),
     });
     if (error) { erro.textContent = error.message; erro.style.display = "block"; if (btn) btn.disabled = false; return; }
     fecharModal();
-    await Promise.all([carregarOS(), carregarTempos()]);
-    abaAtiva = "Concluída"; render();
+    await Promise.all([carregarOS(), carregarTempos(), carregarAssinaturas()]);
+    // se as duas foram coletadas, a O.S. já virou Concluída
+    const atual = allOS.find(o => o.id === osId);
+    if (atual && atual.status === "Concluída") abaAtiva = "Concluída";
+    render();
   });
 }
 
@@ -791,31 +859,33 @@ async function abrirModalVerAssinatura(osId) {
   const os = allOS.find(o => o.id === osId);
   abrirModal(`
     <div class="modal">
-      <h2>Assinatura — O.S. ${escapeHtml(osLabel(os))}</h2>
+      <h2>Assinaturas — O.S. ${escapeHtml(osLabel(os))}</h2>
       <div id="ver-assinatura"><p class="carregando">Carregando...</p></div>
       <div class="modal-actions"><button type="button" class="btn-secondary" data-fechar>Fechar</button></div>
     </div>`);
 
   const { data, error } = await supabase
     .from("assinaturas")
-    .select("nome_responsavel, assinatura_png, coletado_em, coletor:perfis!assinaturas_coletado_por_fkey(nome)")
+    .select("papel, nome_responsavel, assinatura_png, coletado_em, coletor:perfis!assinaturas_coletado_por_fkey(nome)")
     .eq("os_id", osId)
-    .order("coletado_em", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+    .order("coletado_em");
 
   const alvo = $("#ver-assinatura");
   if (error) { alvo.innerHTML = `<p class="error-msg" style="display:block">${escapeHtml(error.message)}</p>`; return; }
-  if (!data) { alvo.innerHTML = `<p class="vazio">Nenhuma assinatura registrada nesta O.S.</p>`; return; }
+  if (!data || data.length === 0) { alvo.innerHTML = `<p class="vazio">Nenhuma assinatura registrada nesta O.S.</p>`; return; }
 
-  alvo.innerHTML = `
-    <div class="assinatura-view">
-      <img src="${data.assinatura_png}" alt="Assinatura de ${escapeHtml(data.nome_responsavel)}" />
-    </div>
-    <div class="os-meta" style="margin-top:12px">
-      <span>Responsável: ${escapeHtml(data.nome_responsavel)}</span>
-      <span>Coletada por ${escapeHtml(data.coletor?.nome || "—")} em ${formatarDataCurta(data.coletado_em)}</span>
-    </div>`;
+  const rotulo = (p) => p === "inspetor" ? "Inspetor" : p === "supervisor" ? "Supervisor de Manutenção" : "Responsável";
+  alvo.innerHTML = data.map(a => `
+    <div class="assinatura-bloco">
+      <div class="assinatura-papel">${escapeHtml(rotulo(a.papel))}</div>
+      <div class="assinatura-view">
+        <img src="${a.assinatura_png}" alt="Assinatura de ${escapeHtml(a.nome_responsavel)}" />
+      </div>
+      <div class="os-meta" style="margin-top:8px">
+        <span>${escapeHtml(a.nome_responsavel)}</span>
+        <span>Coletada por ${escapeHtml(a.coletor?.nome || "—")} em ${formatarDataCurta(a.coletado_em)}</span>
+      </div>
+    </div>`).join("");
 }
 
 // Signature pad minimalista sobre <canvas>, com Pointer Events (funciona
