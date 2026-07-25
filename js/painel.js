@@ -591,6 +591,23 @@ function abrirModalConcluir(osId) {
             <option value="Interromper uso">Interromper uso</option>
           </select>
         </div>
+
+        <div class="field"><label>Há risco de contaminação?</label>
+          <div class="radio-group">
+            <label class="radio-option"><input type="radio" name="risco" value="nao" checked /> Não</label>
+            <label class="radio-option"><input type="radio" name="risco" value="sim" /> Sim</label>
+          </div>
+        </div>
+        <div class="field" id="wrap-contam" style="display:none">
+          <label>Checklist de contaminação</label>
+          <div class="check-group">
+            <label class="check-option"><input type="checkbox" id="c-limpeza" /> Equipamento limpo</label>
+            <label class="check-option"><input type="checkbox" id="c-area" /> Área limpa</label>
+            <label class="check-option"><input type="checkbox" id="c-objetos" /> Sem objetos estranhos</label>
+            <label class="check-option"><input type="checkbox" id="c-liberado" /> Equipamento liberado</label>
+          </div>
+        </div>
+
         <p class="error-msg" id="erro-concluir" style="display:none"></p>
         <div class="modal-actions">
           <button type="button" class="btn-secondary" data-fechar>Cancelar</button>
@@ -602,12 +619,23 @@ function abrirModalConcluir(osId) {
   document.querySelectorAll('input[name="eficiente"]').forEach(r => r.addEventListener("change", (e) => {
     $("#wrap-acao").style.display = e.target.value === "nao" ? "block" : "none";
   }));
+  document.querySelectorAll('input[name="risco"]').forEach(r => r.addEventListener("change", (e) => {
+    $("#wrap-contam").style.display = e.target.value === "sim" ? "block" : "none";
+  }));
 
   $("#form-concluir").addEventListener("submit", async (e) => {
     e.preventDefault();
     const eficiente = document.querySelector('input[name="eficiente"]:checked').value === "sim";
+    const risco = document.querySelector('input[name="risco"]:checked').value === "sim";
     const { error } = await supabase.rpc("concluir_os", {
-      p_os_id: osId, p_manutencao_eficiente: eficiente, p_acao: eficiente ? null : $("#f-acao").value,
+      p_os_id: osId,
+      p_manutencao_eficiente: eficiente,
+      p_acao: eficiente ? null : $("#f-acao").value,
+      p_risco_contaminacao: risco,
+      p_limpeza_equipamento: risco ? $("#c-limpeza").checked : null,
+      p_area_limpa: risco ? $("#c-area").checked : null,
+      p_ausencia_objetos_estranhos: risco ? $("#c-objetos").checked : null,
+      p_equipamento_liberado: risco ? $("#c-liberado").checked : null,
     });
     if (error) { $("#erro-concluir").textContent = error.message; $("#erro-concluir").style.display = "block"; return; }
     fecharModal();

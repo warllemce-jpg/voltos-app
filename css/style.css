@@ -290,6 +290,14 @@ label { font-size: 13px; color: var(--text-dim); font-weight: 500; display: bloc
 }
 .radio-option:has(input:checked) { border-color: var(--accent); background: rgba(245,166,35,0.08); }
 
+.check-group { display: flex; flex-direction: column; gap: 8px; }
+.check-option {
+  display: flex; align-items: center; gap: 10px; padding: 10px 12px;
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-sm);
+  font-size: 14px; cursor: pointer;
+}
+.check-option:has(input:checked) { border-color: var(--verde); background: rgba(61,220,132,0.08); }
+
 .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 
 /* -------------------- stat tiles (modal Tempos) -------------------- */
