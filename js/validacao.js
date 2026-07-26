@@ -46,7 +46,7 @@ async function carregar() {
     .from("ordens_servico")
     .select("id, codigo, numero, setor_solicitante, status, chave, equipamentos(nome), equipamento_outro")
     .neq("status", "Cancelada")
-    .order("codigo");
+    .order("criada_em", { ascending: true }); // ordem de chegada: a mais antiga esperando a chave fica no topo
 
   if (error) {
     el.innerHTML = `<div class="empty-state"><div class="icon">⚠️</div>Não consegui carregar.<br />
