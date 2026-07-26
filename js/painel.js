@@ -325,6 +325,11 @@ function osCardHtml(os) {
   // trabalho (tudo menos "Aberta")
   if (souGestor && os.status !== "Aberta") acoes += botao("tempos", os.id, "Tempos", "btn-ghost");
 
+  // Editar os dados de abertura: o gestor sempre; o criador enquanto a O.S.
+  // não estiver encerrada (Concluída/Cancelada).
+  const podeEditar = souGestor || (os.criada_por === perfil.id && os.status !== "Concluída" && os.status !== "Cancelada");
+  if (podeEditar) acoes += botao("editar", os.id, "Editar", "btn-ghost");
+
   return `
     <div class="os-card ${slugPrio(os.prioridade)}">
       <div class="os-card-top">
@@ -452,6 +457,7 @@ async function onListaClick(e) {
   if (action === "cancelar") return abrirModalCancelar(osId);
   if (action === "material") return abrirModalMaterial(osId);
   if (action === "tempos") return abrirModalTempos(osId);
+  if (action === "editar") return abrirModalEditarOS(osId);
   if (action === "assinar-inspetor") return abrirModalAssinatura(osId, "inspetor");
   if (action === "assinar-supervisor") return abrirModalAssinatura(osId, "supervisor");
   if (action === "ver-assinatura") return abrirModalVerAssinatura(osId);
@@ -495,56 +501,104 @@ function abrirModal(html) {
   modalSlot().querySelectorAll("[data-fechar]").forEach(b => b.addEventListener("click", fecharModal));
 }
 
-function abrirModalNovaOS() {
-  const opcoesEquip = equipamentos.map(e => `<option value="${e.id}">${escapeHtml(e.nome)}</option>`).join("");
+// Campos do formulário de O.S. (abertura). Pré-preenche a partir de `os`
+// quando é edição; vazio/padrão quando é nova. Usado por Nova O.S. e Editar.
+function camposOSHtml(os) {
+  os = os || {};
   const setores = ["Produção", "Qualidade", "Segurança", "Logística", "Almoxarifado", "Utilidades", "Administrativo", "Elétrica"];
-  const opcoesSetor = setores.map(s => `<option value="${s}">${s}</option>`).join("");
-  const opcoesMotivoEmerg = motivosEmergencia.map(m => `<option value="${m.id}">${escapeHtml(m.descricao)}</option>`).join("");
+  const sel = (a, b) => a === b ? "selected" : "";
+  // escapeHtml não escapa aspas duplas — para value="..." precisa disso.
+  const attr = (v) => escapeHtml(v || "").replaceAll('"', "&quot;");
+  const opcoesSetor = setores.map(s => `<option value="${s}" ${sel(os.setor_solicitante, s)}>${s}</option>`).join("");
+  const opcoesEquip = equipamentos.map(e => `<option value="${e.id}" ${sel(os.equipamento_id, e.id)}>${escapeHtml(e.nome)}</option>`).join("");
+  const opcoesMotivoEmerg = motivosEmergencia.map(m => `<option value="${m.id}" ${sel(os.motivo_emergencia_id, m.id)}>${escapeHtml(m.descricao)}</option>`).join("");
+  const equipOutro = os.equipamento_outro ? "__outro__" : "";
+  const ts = os.tipo_servico || "Manutenção";
+  const tm = os.tipo_manutencao || "Preventiva";
+  const prio = os.prioridade || "Normal";
+  const motivoOutro = os.motivo_emergencia_outro ? "__outro__" : "";
 
+  return `
+    <div class="field"><label>Setor solicitante</label>
+      <select id="f-setor" required><option value="">Selecione...</option>${opcoesSetor}</select></div>
+
+    <div class="field"><label>Equipamento</label>
+      <select id="f-equip"><option value="">Selecione...</option>${opcoesEquip}<option value="__outro__" ${sel(equipOutro, "__outro__")}>Outro (digitar)</option></select></div>
+    <div class="field" id="wrap-equip-outro" style="display:none">
+      <label>Nome do equipamento</label><input id="f-equip-outro" type="text" value="${attr(os.equipamento_outro)}" /></div>
+
+    <div class="field"><label>Tag (opcional)</label><input id="f-tag" type="text" value="${attr(os.tag)}" /></div>
+
+    <div class="field"><label>Tipo de serviço</label>
+      <select id="f-tipo-servico" required>
+        <option value="Manutenção" ${sel(ts, "Manutenção")}>Manutenção</option>
+        <option value="Confecção" ${sel(ts, "Confecção")}>Confecção</option>
+        <option value="Instalação" ${sel(ts, "Instalação")}>Instalação</option>
+      </select></div>
+
+    <div class="field" id="wrap-tipo-manutencao"><label>Tipo de manutenção</label>
+      <select id="f-tipo-manutencao">
+        <option value="Preventiva" ${sel(tm, "Preventiva")}>Preventiva</option>
+        <option value="Corretiva" ${sel(tm, "Corretiva")}>Corretiva</option>
+        <option value="Preditiva" ${sel(tm, "Preditiva")}>Preditiva</option>
+      </select></div>
+
+    <div class="field"><label>Descrição do serviço</label>
+      <textarea id="f-descricao" rows="3" required>${escapeHtml(os.descricao || "")}</textarea></div>
+
+    <div class="field"><label>Prioridade</label>
+      <div class="radio-group">
+        <label class="radio-option"><input type="radio" name="prio" value="Normal" ${prio === "Normal" ? "checked" : ""} /> Normal</label>
+        <label class="radio-option"><input type="radio" name="prio" value="Prioritária" ${prio === "Prioritária" ? "checked" : ""} /> Prioritária</label>
+        <label class="radio-option"><input type="radio" name="prio" value="Emergencial" ${prio === "Emergencial" ? "checked" : ""} /> Emergencial</label>
+      </div></div>
+
+    <div class="field" id="wrap-motivo-emerg" style="display:none">
+      <label>Motivo da emergência</label>
+      <select id="f-motivo-emerg"><option value="">Selecione...</option>${opcoesMotivoEmerg}<option value="__outro__" ${sel(motivoOutro, "__outro__")}>Outro (digitar)</option></select>
+      <input id="f-motivo-emerg-outro" type="text" style="display:none; margin-top:8px" placeholder="Descreva o motivo" value="${attr(os.motivo_emergencia_outro)}" />
+    </div>`;
+}
+
+// Liga os campos condicionais (mostrar/esconder) e já aplica a visibilidade
+// inicial conforme os valores atuais (importante na edição pré-preenchida).
+function ligarCamposOS() {
+  const syncEquip = () => { $("#wrap-equip-outro").style.display = $("#f-equip").value === "__outro__" ? "block" : "none"; };
+  const syncTipo = () => { $("#wrap-tipo-manutencao").style.display = $("#f-tipo-servico").value === "Manutenção" ? "block" : "none"; };
+  const syncPrio = () => { $("#wrap-motivo-emerg").style.display = document.querySelector('input[name="prio"]:checked')?.value === "Emergencial" ? "block" : "none"; };
+  const syncMotivo = () => { $("#f-motivo-emerg-outro").style.display = $("#f-motivo-emerg").value === "__outro__" ? "block" : "none"; };
+  $("#f-equip").addEventListener("change", syncEquip);
+  $("#f-tipo-servico").addEventListener("change", syncTipo);
+  document.querySelectorAll('input[name="prio"]').forEach(r => r.addEventListener("change", syncPrio));
+  $("#f-motivo-emerg").addEventListener("change", syncMotivo);
+  syncEquip(); syncTipo(); syncPrio(); syncMotivo();
+}
+
+// Lê os campos do formulário num objeto (só os dados de abertura).
+function lerCamposOS() {
+  const equipVal = $("#f-equip").value;
+  const prioridade = document.querySelector('input[name="prio"]:checked').value;
+  const motivoEmergVal = $("#f-motivo-emerg").value;
+  return {
+    setor_solicitante: $("#f-setor").value,
+    equipamento_id: equipVal && equipVal !== "__outro__" ? equipVal : null,
+    equipamento_outro: equipVal === "__outro__" ? $("#f-equip-outro").value : null,
+    tag: $("#f-tag").value || null,
+    tipo_servico: $("#f-tipo-servico").value,
+    tipo_manutencao: $("#f-tipo-servico").value === "Manutenção" ? $("#f-tipo-manutencao").value : null,
+    descricao: $("#f-descricao").value,
+    prioridade,
+    motivo_emergencia_id: prioridade === "Emergencial" && motivoEmergVal !== "__outro__" ? motivoEmergVal || null : null,
+    motivo_emergencia_outro: prioridade === "Emergencial" && motivoEmergVal === "__outro__" ? $("#f-motivo-emerg-outro").value : null,
+  };
+}
+
+function abrirModalNovaOS() {
   abrirModal(`
     <div class="modal">
       <h2>Nova O.S.</h2>
       <form id="form-nova-os">
-        <div class="field"><label>Setor solicitante</label>
-          <select id="f-setor" required><option value="">Selecione...</option>${opcoesSetor}</select></div>
-
-        <div class="field"><label>Equipamento</label>
-          <select id="f-equip"><option value="">Selecione...</option>${opcoesEquip}<option value="__outro__">Outro (digitar)</option></select></div>
-        <div class="field" id="wrap-equip-outro" style="display:none">
-          <label>Nome do equipamento</label><input id="f-equip-outro" type="text" /></div>
-
-        <div class="field"><label>Tag (opcional)</label><input id="f-tag" type="text" /></div>
-
-        <div class="field"><label>Tipo de serviço</label>
-          <select id="f-tipo-servico" required>
-            <option value="Manutenção">Manutenção</option>
-            <option value="Confecção">Confecção</option>
-            <option value="Instalação">Instalação</option>
-          </select></div>
-
-        <div class="field" id="wrap-tipo-manutencao"><label>Tipo de manutenção</label>
-          <select id="f-tipo-manutencao">
-            <option value="Preventiva">Preventiva</option>
-            <option value="Corretiva">Corretiva</option>
-            <option value="Preditiva">Preditiva</option>
-          </select></div>
-
-        <div class="field"><label>Descrição do serviço</label>
-          <textarea id="f-descricao" rows="3" required></textarea></div>
-
-        <div class="field"><label>Prioridade</label>
-          <div class="radio-group">
-            <label class="radio-option"><input type="radio" name="prio" value="Normal" checked /> Normal</label>
-            <label class="radio-option"><input type="radio" name="prio" value="Prioritária" /> Prioritária</label>
-            <label class="radio-option"><input type="radio" name="prio" value="Emergencial" /> Emergencial</label>
-          </div></div>
-
-        <div class="field" id="wrap-motivo-emerg" style="display:none">
-          <label>Motivo da emergência</label>
-          <select id="f-motivo-emerg"><option value="">Selecione...</option>${opcoesMotivoEmerg}<option value="__outro__">Outro (digitar)</option></select>
-          <input id="f-motivo-emerg-outro" type="text" style="display:none; margin-top:8px" placeholder="Descreva o motivo" />
-        </div>
-
+        ${camposOSHtml(null)}
         <p class="error-msg" id="erro-nova-os" style="display:none"></p>
         <div class="modal-actions">
           <button type="button" class="btn-secondary" data-fechar>Cancelar</button>
@@ -552,43 +606,13 @@ function abrirModalNovaOS() {
         </div>
       </form>
     </div>`);
-
-  $("#f-equip").addEventListener("change", (e) => {
-    $("#wrap-equip-outro").style.display = e.target.value === "__outro__" ? "block" : "none";
-  });
-  $("#f-tipo-servico").addEventListener("change", (e) => {
-    $("#wrap-tipo-manutencao").style.display = e.target.value === "Manutenção" ? "block" : "none";
-  });
-  document.querySelectorAll('input[name="prio"]').forEach(r => r.addEventListener("change", (e) => {
-    $("#wrap-motivo-emerg").style.display = e.target.value === "Emergencial" ? "block" : "none";
-  }));
-  $("#f-motivo-emerg").addEventListener("change", (e) => {
-    $("#f-motivo-emerg-outro").style.display = e.target.value === "__outro__" ? "block" : "none";
-  });
+  ligarCamposOS();
 
   $("#form-nova-os").addEventListener("submit", async (e) => {
     e.preventDefault();
     const { btn: btnEnvio, ok } = travarEnvio(e);
-    if (!ok) return; // já está inserindo — ignora clique repetido
-    const equipVal = $("#f-equip").value;
-    const prioridade = document.querySelector('input[name="prio"]:checked').value;
-    const motivoEmergVal = $("#f-motivo-emerg").value;
-
-    const payload = {
-      setor_solicitante: $("#f-setor").value,
-      equipamento_id: equipVal && equipVal !== "__outro__" ? equipVal : null,
-      equipamento_outro: equipVal === "__outro__" ? $("#f-equip-outro").value : null,
-      tag: $("#f-tag").value || null,
-      tipo_servico: $("#f-tipo-servico").value,
-      tipo_manutencao: $("#f-tipo-servico").value === "Manutenção" ? $("#f-tipo-manutencao").value : null,
-      descricao: $("#f-descricao").value,
-      prioridade,
-      motivo_emergencia_id: prioridade === "Emergencial" && motivoEmergVal !== "__outro__" ? motivoEmergVal || null : null,
-      motivo_emergencia_outro: prioridade === "Emergencial" && motivoEmergVal === "__outro__" ? $("#f-motivo-emerg-outro").value : null,
-      criada_por: perfil.id,
-      status: "Aberta",
-    };
-
+    if (!ok) return;
+    const payload = { ...lerCamposOS(), criada_por: perfil.id, status: "Aberta" };
     const { error } = await supabase.from("ordens_servico").insert(payload);
     if (error) {
       $("#erro-nova-os").textContent = error.message; $("#erro-nova-os").style.display = "block";
@@ -596,6 +620,52 @@ function abrirModalNovaOS() {
     }
     fecharModal();
     await carregarOS(); abaAtiva = "Aberta"; render();
+  });
+}
+
+// Editar os dados de abertura da O.S. Criador edita enquanto não está
+// encerrada; o gestor edita sempre (via RPC editar_os, que valida isso).
+function abrirModalEditarOS(osId) {
+  const os = allOS.find(o => o.id === osId);
+  if (!os) return;
+  abrirModal(`
+    <div class="modal">
+      <h2>Editar O.S. ${escapeHtml(osLabel(os))}</h2>
+      <form id="form-editar-os">
+        ${camposOSHtml(os)}
+        <p class="error-msg" id="erro-editar-os" style="display:none"></p>
+        <div class="modal-actions">
+          <button type="button" class="btn-secondary" data-fechar>Cancelar</button>
+          <button type="submit" class="btn-primary">Salvar</button>
+        </div>
+      </form>
+    </div>`);
+  ligarCamposOS();
+
+  $("#form-editar-os").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const { btn: btnEnvio, ok } = travarEnvio(e);
+    if (!ok) return;
+    const c = lerCamposOS();
+    const { error } = await supabase.rpc("editar_os", {
+      p_os_id: osId,
+      p_setor_solicitante: c.setor_solicitante,
+      p_equipamento_id: c.equipamento_id,
+      p_equipamento_outro: c.equipamento_outro,
+      p_tag: c.tag,
+      p_tipo_servico: c.tipo_servico,
+      p_tipo_manutencao: c.tipo_manutencao,
+      p_descricao: c.descricao,
+      p_prioridade: c.prioridade,
+      p_motivo_emergencia_id: c.motivo_emergencia_id,
+      p_motivo_emergencia_outro: c.motivo_emergencia_outro,
+    });
+    if (error) {
+      $("#erro-editar-os").textContent = error.message; $("#erro-editar-os").style.display = "block";
+      destravarEnvio(btnEnvio); return;
+    }
+    fecharModal();
+    await carregarOS(); render();
   });
 }
 
@@ -656,9 +726,10 @@ function abrirModalConcluir(osId) {
             <label class="radio-option"><input type="radio" name="eficiente" value="nao" /> Não</label>
           </div>
         </div>
-        <div class="field" id="wrap-acao" style="display:none">
+        <div class="field">
           <label>Ação tomada</label>
-          <select id="f-acao">
+          <select id="f-acao" required>
+            <option value="">Selecione...</option>
             <option value="Refazer">Refazer</option>
             <option value="Liberar">Liberar</option>
             <option value="Interromper uso">Interromper uso</option>
@@ -692,9 +763,7 @@ function abrirModalConcluir(osId) {
       </form>
     </div>`);
 
-  document.querySelectorAll('input[name="eficiente"]').forEach(r => r.addEventListener("change", (e) => {
-    $("#wrap-acao").style.display = e.target.value === "nao" ? "block" : "none";
-  }));
+  // "Ação" é sempre obrigatória e independente da eficiência (regra do F84).
   document.querySelectorAll('input[name="risco"]').forEach(r => r.addEventListener("change", (e) => {
     $("#wrap-contam").style.display = e.target.value === "sim" ? "block" : "none";
   }));
@@ -705,11 +774,13 @@ function abrirModalConcluir(osId) {
     const risco = document.querySelector('input[name="risco"]:checked').value === "sim";
     const erro = $("#erro-concluir");
     const servicos = $("#f-servicos").value.trim();
+    const acao = $("#f-acao").value;
     if (!servicos) { erro.textContent = "Descreva os serviços realizados."; erro.style.display = "block"; return; }
+    if (!acao) { erro.textContent = "Selecione a ação tomada."; erro.style.display = "block"; return; }
     const { error } = await supabase.rpc("concluir_os", {
       p_os_id: osId,
       p_manutencao_eficiente: eficiente,
-      p_acao: eficiente ? null : $("#f-acao").value,
+      p_acao: acao,
       p_risco_contaminacao: risco,
       p_limpeza_equipamento: risco ? $("#c-limpeza").checked : null,
       p_area_limpa: risco ? $("#c-area").checked : null,

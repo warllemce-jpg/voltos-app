@@ -37,6 +37,19 @@ async function init() {
 
   document.title = `O.S. ${os.codigo || "#" + os.numero} — F84`;
   render(os, eventos || [], materiais || [], checklist || {}, assinaturas || []);
+
+  // Não libera impressão sem a chave de validação preenchida.
+  const temChave = os.chave && os.chave.trim().length > 0;
+  if (!temChave) {
+    document.body.classList.add("f84-sem-chave");
+    const btn = $("#btn-imprimir");
+    btn.disabled = true;
+    btn.title = "Preencha a chave de validação antes de imprimir";
+    const aviso = document.createElement("div");
+    aviso.className = "f84-aviso no-print";
+    aviso.textContent = "⚠️ Esta O.S. ainda não tem a chave de validação preenchida — não é possível imprimir/exportar. Preencha a chave na tela Validação.";
+    $("#f84-doc").prepend(aviso);
+  }
 }
 
 function erro(msg) {
@@ -127,7 +140,7 @@ function render(os, eventos, materiais, ck, assinaturas) {
       </div>
     </section>
 
-    <!-- Seção 6 (condicional) -->
+    <!-- Seção 6 -->
     <section class="f84-secao">
       <h2>Segurança Alimentar / Risco de Contaminação</h2>
       <div class="f84-grid">
@@ -141,15 +154,19 @@ function render(os, eventos, materiais, ck, assinaturas) {
           ${campo("Equipamento liberado para uso?", simNao(ck.equipamento_liberado ?? null))}
           ${campo("Inspeção realizada por", txt(insp?.nome_responsavel))}
           ${campo("Data da Avaliação", fmtData(insp?.coletado_em || ck.preenchido_em))}
-          ${campo("Supervisor de Manutenção", txt(sup?.nome_responsavel), "full")}
-        </div>` : `<p class="f84-na">Sem risco de contaminação — bloco não aplicável.</p>`}
+        </div>` : ""}
+      <div class="f84-ass-inspetor">
+        <span class="f84-ass-titulo">Assinatura</span>
+        ${risco
+          ? `<span class="f84-ass-inline">${insp?.assinatura_png ? `<img src="${insp.assinatura_png}" alt="assinatura do inspetor" />` : ""}<span class="f84-ass-nome">${txt(insp?.nome_responsavel)}</span></span>`
+          : `<span class="f84-ass-na">não se aplica</span>`}
+      </div>
     </section>
 
-    <!-- Assinaturas coletadas -->
+    <!-- Assinatura do supervisor (única) -->
     <section class="f84-secao f84-assinaturas">
-      <h2>Assinaturas</h2>
+      <h2>Assinatura</h2>
       <div class="f84-assrow">
-        ${risco ? blocoAssinatura("Inspetor", insp) : ""}
         ${blocoAssinatura("Supervisor de Manutenção", sup)}
       </div>
     </section>
@@ -157,7 +174,8 @@ function render(os, eventos, materiais, ck, assinaturas) {
     <footer class="f84-rodape">
       ${RODAPE.map(l => `<div>${escapeHtml(l)}</div>`).join("")}
     </footer>
-  </div>`;
+  </div>
+  <div class="f84-print-bloqueio">Não é possível imprimir: a chave de validação desta O.S. ainda não foi preenchida.</div>`;
 }
 
 function blocoAssinatura(rotulo, ass) {
