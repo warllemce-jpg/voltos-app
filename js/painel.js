@@ -83,8 +83,12 @@ async function carregarLookups() {
     supabase.from("motivos_emergencia").select("*").eq("ativo", true).order("ordem"),
   ]);
   equipamentos = eq.data || [];
-  motivosPausa = (mp.data || []).filter(m => !m.sistema); // motivo "sistema" não aparece como opção manual
-  motivosEmergencia = me.data || [];
+  // "sistema" não aparece como opção manual; e filtramos um "Outro" vindo do
+  // banco (do seed) porque os modais já têm o próprio "Outro" de texto livre —
+  // senão aparece "Outro" duas vezes.
+  const ehOutro = (m) => (m.descricao || "").trim().toLowerCase() === "outro";
+  motivosPausa = (mp.data || []).filter(m => !m.sistema && !ehOutro(m));
+  motivosEmergencia = (me.data || []).filter(m => !ehOutro(m));
 }
 
 async function carregarOS() {
@@ -298,15 +302,21 @@ function osCardHtml(os) {
     if (riscoPorOS.get(os.id) === true && souExecutor) {
       acoes += botao("assinar-inspetor", os.id, ass.inspetor ? "Inspetor ✓" : "Assinar inspetor", ass.inspetor ? "btn-ghost" : "btn-primary");
     }
-    // Supervisor de Manutenção: só na tela do admin (gestor).
+    // Supervisor de Manutenção: só na tela do admin (gestor). E, com risco,
+    // só depois do inspetor assinar (o botão fica travado até lá).
     if (souGestor) {
-      acoes += botao("assinar-supervisor", os.id, ass.supervisor ? "Supervisor ✓" : "Assinar supervisor", ass.supervisor ? "btn-ghost" : "btn-primary");
+      const travadoPeloInspetor = riscoPorOS.get(os.id) === true && !ass.inspetor;
+      if (travadoPeloInspetor) {
+        acoes += `<button class="btn-secondary" disabled title="O inspetor precisa assinar antes">Assinar supervisor (aguardando inspetor)</button>`;
+      } else {
+        acoes += botao("assinar-supervisor", os.id, ass.supervisor ? "Supervisor ✓" : "Assinar supervisor", ass.supervisor ? "btn-ghost" : "btn-primary");
+      }
       acoes += botao("cancelar", os.id, "Cancelar", "btn-danger");
     }
   }
 
   // Ver a assinatura já coletada (só gestor, nas concluídas)
-  if (souGestor && os.status === "Concluída") acoes += botao("ver-assinatura", os.id, "Ver assinatura", "btn-ghost");
+  if (souGestor && os.status === "Concluída") acoes += botao("ver-assinatura", os.id, "Ver assinaturas", "btn-ghost");
 
   // Gestor: detalhamento de tempo por pessoa em qualquer O.S. que já teve
   // trabalho (tudo menos "Aberta")
@@ -706,7 +716,9 @@ function abrirModalConcluir(osId) {
     });
     if (error) { erro.textContent = error.message; erro.style.display = "block"; return; }
     fecharModal();
-    await Promise.all([carregarOS(), carregarTempos(), carregarAjudantesPorOS()]);
+    // recarrega risco + assinaturas também, senão o card recém-concluído
+    // aparece sem o botão do inspetor (mesmo com risco) até um reload.
+    await Promise.all([carregarOS(), carregarTempos(), carregarAjudantesPorOS(), carregarRiscoContam(), carregarAssinaturas()]);
     abaAtiva = "Aguardando assinatura"; render();
   });
 }
