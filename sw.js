@@ -12,6 +12,8 @@ const SHELL = [
   "./relatorio.html",
   "./validacao.html",
   "./indicadores.html",
+  "./f84.html",
+  "./logo_itaueira.png",
   "./css/style.css",
   "./manifest.json",
   "./icons/icon.svg",

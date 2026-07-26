@@ -315,8 +315,11 @@ function osCardHtml(os) {
     }
   }
 
-  // Ver a assinatura já coletada (só gestor, nas concluídas)
-  if (souGestor && os.status === "Concluída") acoes += botao("ver-assinatura", os.id, "Ver assinaturas", "btn-ghost");
+  // Ver a assinatura já coletada + exportar o F84 (só gestor, nas concluídas)
+  if (souGestor && os.status === "Concluída") {
+    acoes += botao("exportar-f84", os.id, "Exportar F84", "btn-secondary");
+    acoes += botao("ver-assinatura", os.id, "Ver assinaturas", "btn-ghost");
+  }
 
   // Gestor: detalhamento de tempo por pessoa em qualquer O.S. que já teve
   // trabalho (tudo menos "Aberta")
@@ -452,6 +455,7 @@ async function onListaClick(e) {
   if (action === "assinar-inspetor") return abrirModalAssinatura(osId, "inspetor");
   if (action === "assinar-supervisor") return abrirModalAssinatura(osId, "supervisor");
   if (action === "ver-assinatura") return abrirModalVerAssinatura(osId);
+  if (action === "exportar-f84") return window.open("f84.html?os=" + osId, "_blank");
 }
 
 async function chamarRpc(nome, params, btnOrigem) {
