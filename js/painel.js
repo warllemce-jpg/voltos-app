@@ -292,15 +292,17 @@ function osCardHtml(os) {
   }
 
   if (os.status === "Aguardando assinatura") {
-    if (souExecutor || souGestor) {
-      const ass = assinaturasPorOS.get(os.id) || {};
-      // Inspetor só quando há risco de contaminação; Supervisor sempre.
-      if (riscoPorOS.get(os.id) === true) {
-        acoes += botao("assinar-inspetor", os.id, ass.inspetor ? "Inspetor ✓" : "Assinar inspetor", ass.inspetor ? "btn-ghost" : "btn-primary");
-      }
-      acoes += botao("assinar-supervisor", os.id, ass.supervisor ? "Supervisor ✓" : "Assinar supervisor", ass.supervisor ? "btn-ghost" : "btn-primary");
+    const ass = assinaturasPorOS.get(os.id) || {};
+    // Inspetor: só quando há risco de contaminação, e no perfil do
+    // colaborador que executou (é ele quem acompanha a inspeção).
+    if (riscoPorOS.get(os.id) === true && souExecutor) {
+      acoes += botao("assinar-inspetor", os.id, ass.inspetor ? "Inspetor ✓" : "Assinar inspetor", ass.inspetor ? "btn-ghost" : "btn-primary");
     }
-    if (souGestor) acoes += botao("cancelar", os.id, "Cancelar", "btn-danger");
+    // Supervisor de Manutenção: só na tela do admin (gestor).
+    if (souGestor) {
+      acoes += botao("assinar-supervisor", os.id, ass.supervisor ? "Supervisor ✓" : "Assinar supervisor", ass.supervisor ? "btn-ghost" : "btn-primary");
+      acoes += botao("cancelar", os.id, "Cancelar", "btn-danger");
+    }
   }
 
   // Ver a assinatura já coletada (só gestor, nas concluídas)
@@ -362,9 +364,10 @@ function assinaturasHtml(os) {
     ? `${rotulo}: <span class="ass-ok">✓ ${escapeHtml(nome)}</span>`
     : `${rotulo}: <span class="ass-pend">pendente</span>`;
   const partes = [];
+  // Inspetor aparece quando há risco; Supervisor só pro gestor.
   if (riscoPorOS.get(os.id) === true) partes.push(item("Inspetor", ass.inspetor));
-  partes.push(item("Supervisor", ass.supervisor));
-  return `<span>✍ ${partes.join(" · ")}</span>`;
+  if (perfil.papel === "gestor") partes.push(item("Supervisor", ass.supervisor));
+  return partes.length ? `<span>✍ ${partes.join(" · ")}</span>` : "";
 }
 
 // Tempo de trabalho ATIVO da O.S. (descontando pausas). Para uma O.S. em
@@ -736,10 +739,8 @@ function abrirModalMaterial(osId) {
     <div class="modal">
       <h2>Registrar material utilizado</h2>
       <form id="form-material">
-        <div class="grid-2">
-          <div class="field"><label>Material</label><input id="f-mat-nome" type="text" required /></div>
-          <div class="field"><label>Quantidade</label><input id="f-mat-qtd" type="number" step="any" min="0.01" required /></div>
-        </div>
+        <div class="field"><label>Material utilizado</label>
+          <input id="f-mat-nome" type="text" required placeholder="Ex.: 2 disjuntores 20A, 3 m de cabo 2,5mm" /></div>
         <p class="error-msg" id="erro-material" style="display:none"></p>
         <div class="modal-actions">
           <button type="button" class="btn-secondary" data-fechar>Fechar</button>
@@ -753,7 +754,7 @@ function abrirModalMaterial(osId) {
     const { btn: btnEnvio, ok } = travarEnvio(e);
     if (!ok) return;
     const { error } = await supabase.rpc("registrar_material", {
-      p_os_id: osId, p_nome: $("#f-mat-nome").value, p_quantidade: Number($("#f-mat-qtd").value),
+      p_os_id: osId, p_nome: $("#f-mat-nome").value,
     });
     if (error) {
       $("#erro-material").textContent = error.message; $("#erro-material").style.display = "block";
