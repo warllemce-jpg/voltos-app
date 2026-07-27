@@ -106,6 +106,12 @@ function abrirModalEditarColaborador(c) {
             <option value="colaborador" ${c.papel === "colaborador" ? "selected" : ""}>Colaborador</option>
             <option value="gestor" ${c.papel === "gestor" ? "selected" : ""}>Gestor</option>
           </select></div>
+        <div class="field"><label>Especialidade (opcional)</label>
+          <select id="f-ed-especialidade">
+            <option value="" ${!c.especialidade ? "selected" : ""}>—</option>
+            <option value="Mecânica" ${c.especialidade === "Mecânica" ? "selected" : ""}>Mecânica</option>
+            <option value="Elétrica" ${c.especialidade === "Elétrica" ? "selected" : ""}>Elétrica</option>
+          </select></div>
         <div class="field"><label>Turno (opcional)</label>
           <select id="f-ed-turno">${opTurno}</select></div>
         <p style="color:var(--text-dim); font-size:12px; margin:-4px 0 8px">
@@ -134,6 +140,7 @@ function abrirModalEditarColaborador(c) {
       nome: $("#f-ed-nome").value.trim(),
       papel: $("#f-ed-papel").value,
       turno: $("#f-ed-turno").value || null,
+      especialidade: $("#f-ed-especialidade").value || null,
     }).eq("id", c.id);
     const msg = mensagemDeErro(error);
     if (msg) { $("#erro-ed-colab").textContent = msg; $("#erro-ed-colab").style.display = "block"; return; }
@@ -182,6 +189,13 @@ function abrirModalNovoColaborador() {
           <input id="f-pin" class="pin-input" type="text" inputmode="numeric" pattern="\\d{6}" maxlength="6" required /></div>
         <div class="field"><label>Papel</label>
           <select id="f-papel"><option value="colaborador">Colaborador</option><option value="gestor">Gestor</option></select></div>
+        <div class="field"><label>Especialidade (opcional)</label>
+          <select id="f-especialidade">
+            <option value="">—</option>
+            <option value="Mecânica">Mecânica</option>
+            <option value="Elétrica">Elétrica</option>
+          </select>
+          <p style="color:var(--text-dim); font-size:12px; margin:4px 0 0">Só serve de sugestão automática ao abrir uma O.S.; o colaborador pode trocar na hora.</p></div>
         <div class="field"><label>Turno (opcional)</label>
           <select id="f-turno">
             <option value="">—</option>
@@ -205,6 +219,7 @@ function abrirModalNovoColaborador() {
         pin: $("#f-pin").value,
         papel: $("#f-papel").value,
         turno: $("#f-turno").value || null,
+        especialidade: $("#f-especialidade").value || null,
       },
     });
     if (error || data?.error) {

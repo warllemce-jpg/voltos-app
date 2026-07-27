@@ -20,6 +20,7 @@ let motivosEmergencia = [];
 let ajudanteAtivo = null; // { os_id, os_numero, os_equip }
 let abaAtiva = "Aberta";
 let viewMode = "equipe"; // 'equipe' | 'minhas' — só usado pelo gestor
+let filtroDisciplina = null; // null = todas | 'Mecânica' | 'Elétrica'
 
 const $ = (sel) => document.querySelector(sel);
 const modalSlot = () => $("#modal-slot");
@@ -178,8 +179,26 @@ async function carregarAjudanteAtivo() {
 // ---------------------------------------------------------------------
 function render() {
   renderBannerAjudante();
+  renderFiltroDisciplina();
   renderTabs();
   renderLista();
+}
+
+function renderFiltroDisciplina() {
+  const slot = $("#filtro-disciplina");
+  if (!slot) return;
+  const opts = [
+    { v: null, label: "Todas" },
+    { v: "Mecânica", label: "⚙️ Mecânica" },
+    { v: "Elétrica", label: "⚡ Elétrica" },
+  ];
+  slot.innerHTML = opts.map(o => `
+    <button class="chip-filtro ${filtroDisciplina === o.v ? "ativa" : ""}" data-disc="${o.v === null ? "" : o.v}">${o.label}</button>
+  `).join("");
+  slot.querySelectorAll("[data-disc]").forEach(btn => btn.addEventListener("click", () => {
+    filtroDisciplina = btn.dataset.disc || null;
+    render();
+  }));
 }
 
 function renderBannerAjudante() {
@@ -250,6 +269,7 @@ function osParaTab(status) {
       rows = rows.filter(os => os.cancelada_em ? diasDesde(os.cancelada_em) <= RETENCAO_DIAS : true);
     }
   }
+  if (filtroDisciplina) rows = rows.filter(os => os.disciplina === filtroDisciplina);
   return rows;
 }
 
@@ -334,7 +354,7 @@ function osCardHtml(os) {
     <div class="os-card ${slugPrio(os.prioridade)}">
       <div class="os-card-top">
         <div>
-          <div class="os-numero">O.S. ${escapeHtml(osLabel(os))}</div>
+          <div class="os-numero">O.S. ${escapeHtml(osLabel(os))}${os.disciplina ? ` <span class="os-disc disc-${os.disciplina === "Mecânica" ? "mec" : "ele"}">${os.disciplina === "Mecânica" ? "⚙️" : "⚡"} ${escapeHtml(os.disciplina)}</span>` : ""}</div>
           <div class="os-equip">${escapeHtml(equip)}</div>
           <div class="os-setor">${escapeHtml(os.setor_solicitante)} · ${escapeHtml(os.tipo_servico)}${os.tipo_manutencao ? " · " + escapeHtml(os.tipo_manutencao) : ""}</div>
         </div>
@@ -517,8 +537,17 @@ function camposOSHtml(os) {
   const tm = os.tipo_manutencao || "Preventiva";
   const prio = os.prioridade || "Normal";
   const motivoOutro = os.motivo_emergencia_outro ? "__outro__" : "";
+  // disciplina: na edição vem da própria O.S.; numa nova, o default é a
+  // especialidade do colaborador (ele pode trocar).
+  const disc = os.disciplina || (perfil && perfil.especialidade) || "";
 
   return `
+    <div class="field"><label>Disciplina</label>
+      <div class="radio-group">
+        <label class="radio-option"><input type="radio" name="disciplina" value="Mecânica" ${disc === "Mecânica" ? "checked" : ""} required /> Mecânica</label>
+        <label class="radio-option"><input type="radio" name="disciplina" value="Elétrica" ${disc === "Elétrica" ? "checked" : ""} required /> Elétrica</label>
+      </div></div>
+
     <div class="field"><label>Setor solicitante</label>
       <select id="f-setor" required><option value="">Selecione...</option>${opcoesSetor}</select></div>
 
@@ -579,7 +608,9 @@ function lerCamposOS() {
   const equipVal = $("#f-equip").value;
   const prioridade = document.querySelector('input[name="prio"]:checked').value;
   const motivoEmergVal = $("#f-motivo-emerg").value;
+  const disciplina = document.querySelector('input[name="disciplina"]:checked')?.value || null;
   return {
+    disciplina,
     setor_solicitante: $("#f-setor").value,
     equipamento_id: equipVal && equipVal !== "__outro__" ? equipVal : null,
     equipamento_outro: equipVal === "__outro__" ? $("#f-equip-outro").value : null,
@@ -659,6 +690,7 @@ function abrirModalEditarOS(osId) {
       p_prioridade: c.prioridade,
       p_motivo_emergencia_id: c.motivo_emergencia_id,
       p_motivo_emergencia_outro: c.motivo_emergencia_outro,
+      p_disciplina: c.disciplina,
     });
     if (error) {
       $("#erro-editar-os").textContent = error.message; $("#erro-editar-os").style.display = "block";

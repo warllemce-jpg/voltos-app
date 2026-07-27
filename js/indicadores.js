@@ -77,9 +77,30 @@ async function init() {
     document.querySelectorAll(".info-wrap.aberto").forEach(w => w.classList.remove("aberto"));
   });
 
+  renderFiltroDisciplina();
+
   janela = janelaDoPreset(periodoAtivo);
   sincronizarInputsData();
   carregar();
+}
+
+let filtroDisciplina = null; // null = todas | 'Mecânica' | 'Elétrica'
+function renderFiltroDisciplina() {
+  const slot = $("#filtro-disciplina");
+  if (!slot) return;
+  const opts = [
+    { v: null, label: "Todas" },
+    { v: "Mecânica", label: "⚙️ Mecânica" },
+    { v: "Elétrica", label: "⚡ Elétrica" },
+  ];
+  slot.innerHTML = opts.map(o =>
+    `<button class="chip-filtro ${filtroDisciplina === o.v ? "ativa" : ""}" data-disc="${o.v === null ? "" : o.v}">${o.label}</button>`
+  ).join("");
+  slot.querySelectorAll("[data-disc]").forEach(btn => btn.addEventListener("click", () => {
+    filtroDisciplina = btn.dataset.disc || null;
+    renderFiltroDisciplina();
+    carregar();
+  }));
 }
 
 // ---------------------------------------------------------------------
@@ -140,6 +161,7 @@ async function carregar() {
   const { data, error } = await supabase.rpc("indicadores", {
     p_inicio: janela.de ? janela.de.toISOString() : null,
     p_fim: janela.ate ? janela.ate.toISOString() : null,
+    p_disciplina: filtroDisciplina,
   });
 
   if (error) {
