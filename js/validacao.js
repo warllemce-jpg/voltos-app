@@ -5,6 +5,7 @@ const $ = (sel) => document.querySelector(sel);
 
 let perfil = null;
 let modo = "pendentes"; // 'pendentes' | 'validadas'
+let filtroDisciplina = null; // null = todas | 'Mecânica' | 'Elétrica'
 let linhas = [];
 let eventosPorOS = new Map(); // os_id -> [{evento, hora, editado}]
 
@@ -29,6 +30,7 @@ async function init() {
 
   $("#lista-validacao").addEventListener("click", onListaClick);
 
+  renderFiltroDisciplina();
   carregar();
 
   // Auto-refresh de 30s. Não recarrega enquanto alguém digita num input.
@@ -38,13 +40,31 @@ async function init() {
   }, 30000);
 }
 
+function renderFiltroDisciplina() {
+  const slot = $("#filtro-disciplina");
+  if (!slot) return;
+  const opts = [
+    { v: null, label: "Todas" },
+    { v: "Mecânica", label: "⚙️ Mecânica" },
+    { v: "Elétrica", label: "⚡ Elétrica" },
+  ];
+  slot.innerHTML = opts.map(o =>
+    `<button class="chip-filtro ${filtroDisciplina === o.v ? "ativa" : ""}" data-disc="${o.v === null ? "" : o.v}">${o.label}</button>`
+  ).join("");
+  slot.querySelectorAll("[data-disc]").forEach(btn => btn.addEventListener("click", () => {
+    filtroDisciplina = btn.dataset.disc || null;
+    renderFiltroDisciplina();
+    carregar();
+  }));
+}
+
 async function carregar() {
   const el = $("#lista-validacao");
   if (linhas.length === 0) el.innerHTML = `<p class="carregando">Carregando...</p>`;
 
   const { data, error } = await supabase
     .from("ordens_servico")
-    .select("id, codigo, numero, setor_solicitante, status, chave, equipamentos(nome), equipamento_outro")
+    .select("id, codigo, numero, setor_solicitante, status, disciplina, chave, equipamentos(nome), equipamento_outro")
     .neq("status", "Cancelada")
     .order("criada_em", { ascending: true }); // ordem de chegada: a mais antiga esperando a chave fica no topo
 
@@ -54,7 +74,8 @@ async function carregar() {
     return;
   }
 
-  const todas = data || [];
+  let todas = data || [];
+  if (filtroDisciplina) todas = todas.filter(o => o.disciplina === filtroDisciplina);
   linhas = modo === "pendentes" ? todas.filter(o => !o.chave) : todas.filter(o => o.chave);
 
   // Linha do tempo (início/pausa/retorno/finalização) das O.S. exibidas
@@ -93,6 +114,7 @@ function cardHtml(os) {
       <div class="val-head">
         <div class="val-id">
           <span class="mono val-codigo">${escapeHtml(os.codigo || "#" + os.numero)}</span>
+          ${os.disciplina ? `<span class="os-disc disc-${os.disciplina === "Mecânica" ? "mec" : "ele"}">${os.disciplina === "Mecânica" ? "⚙️" : "⚡"} ${escapeHtml(os.disciplina)}</span>` : ""}
           <span class="val-equip">${escapeHtml(equip)}</span>
           <span class="val-status">${escapeHtml(os.status)}</span>
         </div>
