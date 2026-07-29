@@ -1,5 +1,5 @@
 import { supabase, exigirSessao, sair } from "./supabaseClient.js";
-import { formatarDuracao, escapeHtml } from "./utils.js";
+import { formatarDuracao, escapeHtml, osLabel } from "./utils.js";
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -206,7 +206,7 @@ function detalheHtml() {
     <div class="horas-detalhe">
       ${detalhe.map(d => `
         <div class="detalhe-linha">
-          <span class="mono">${escapeHtml(d.codigo || "#" + d.numero)}</span>
+          <span class="mono">${escapeHtml(osLabel(d))}</span>
           <span class="detalhe-equip">${escapeHtml(d.equipamento)}</span>
           <span class="detalhe-tag">${escapeHtml(d.papel)} · ${escapeHtml(d.status)}</span>
           <strong class="mono">${formatarDuracao(Number(d.segundos_trabalhados))}</strong>

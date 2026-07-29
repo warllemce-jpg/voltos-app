@@ -284,6 +284,13 @@ label { font-size: 13px; color: var(--text-dim); font-weight: 500; display: bloc
 .login-logo p { color: var(--text-dim); font-size: 13px; margin: 0; }
 .pin-input { letter-spacing: 8px; font-family: var(--font-mono); font-size: 20px; text-align: center; }
 .field { margin-bottom: 16px; }
+/* aviso dentro de um campo do formulário (ex.: trocar disciplina regera o
+   registro da O.S.) — informativo, não é erro */
+.field-aviso {
+  margin: 8px 0 0; padding: 8px 10px; font-size: 12.5px; line-height: 1.45;
+  color: var(--text-dim); background: rgba(245,166,35,0.07);
+  border-left: 2px solid var(--accent); border-radius: 4px;
+}
 .error-msg { color: var(--vermelho); font-size: 13px; margin-top: 10px; text-align: center; }
 
 /* -------------------- modal -------------------- */
@@ -515,8 +522,11 @@ label { font-size: 13px; color: var(--text-dim); font-weight: 500; display: bloc
 .val-status {
   font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.03em;
 }
-.val-acao { display: flex; align-items: center; gap: 8px; }
+.val-acao { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .val-input { padding: 9px 11px; font-size: 14px; font-family: var(--font-mono); width: 180px; max-width: 46vw; }
+/* nº da solicitação: texto livre (a F181 não tem formato fixo), então fonte
+   normal pra distinguir da chave, que é só-números */
+.val-input-sol { font-family: var(--font-body); width: 190px; }
 .val-salvar { padding: 9px 14px; font-size: 13px; }
 .val-erro { text-align: left; margin: 10px 0 0; }
 

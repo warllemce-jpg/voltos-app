@@ -1,5 +1,5 @@
 import { supabase, exigirSessao } from "./supabaseClient.js";
-import { escapeHtml } from "./utils.js";
+import { escapeHtml, osLabel } from "./utils.js";
 
 // Metadados FIXOS do formulário (seção 1/8 da especificação — nunca mudam,
 // exceto Versão/Data de revisão se a estrutura do form for alterada).
@@ -35,7 +35,10 @@ async function init() {
     supabase.from("assinaturas").select("papel, nome_responsavel, assinatura_png, coletado_em").eq("os_id", osId),
   ]);
 
-  document.title = `O.S. ${os.codigo || "#" + os.numero} — F84`;
+  // O identificador interno fica só no título da aba (ajuda a achar a janela
+  // certa quando o gestor abre várias). No DOCUMENTO impresso ele não entra —
+  // lá só valem a chave e o Nº da Solicitação, ambos do validador.
+  document.title = `O.S. ${osLabel(os)} — F84`;
   render(os, eventos || [], materiais || [], checklist || {}, assinaturas || []);
 
   // Não libera impressão sem a chave de validação preenchida.
@@ -81,6 +84,13 @@ function txt(v) { return v ? escapeHtml(v) : "—"; }
 
 // ---------------------------------------------------------------------
 // Render
+//
+// Identificadores no documento: só entram a "Chave" e o "N° da Solicitação",
+// ambos lançados pelo gestor na tela de Validação. O "N° da Solicitação" é o
+// número da F181 física e é OPCIONAL — serviço que o técnico inicia por conta
+// própria não tem solicitação, e aí o campo sai em branco. Até 28/07/2026 esse
+// campo imprimia o codigo interno (07/26-P04) por engano: são coisas
+// diferentes. O registro (M-007) e o codigo NÃO aparecem no F84 — só no app.
 // ---------------------------------------------------------------------
 function render(os, eventos, materiais, ck, assinaturas) {
   const inicio = eventos.find(e => e.tipo_evento === "inicio");
@@ -114,7 +124,7 @@ function render(os, eventos, materiais, ck, assinaturas) {
       <h2>Dados da Ordem de Serviço</h2>
       <div class="f84-grid">
         ${campo("Chave", txt(os.chave))}
-        ${campo("N° da Solicitação", txt(os.codigo))}
+        ${campo("N° da Solicitação", txt(os.numero_solicitacao))}
         ${campo("Equipamento", escapeHtml(equip))}
         ${campo("Tag", txt(os.tag))}
         ${campo("Setor", txt(os.setor_solicitante))}

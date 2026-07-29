@@ -1,5 +1,5 @@
 import { supabase, exigirSessao, sair } from "./supabaseClient.js";
-import { formatarDataCurta, formatarDuracao, diasDesde, slugPrio, escapeHtml } from "./utils.js";
+import { formatarDataCurta, formatarDuracao, diasDesde, slugPrio, escapeHtml, osLabel } from "./utils.js";
 
 const STATUS_TABS = ["Aberta", "Em andamento", "Pausada", "Aguardando assinatura", "Concluída", "Cancelada"];
 // Rótulo curto na aba (o status "Aguardando assinatura" é longo demais pro
@@ -379,12 +379,6 @@ function botao(action, osId, label, classe) {
   return `<button class="${classe}" data-action="${action}" data-os="${osId}">${label}</button>`;
 }
 
-// Identificador da O.S. no padrão da empresa (ex.: 07/26-P04). O.S. muito
-// antigas, sem código, caem no #N interno como fallback.
-function osLabel(os) {
-  return os?.codigo || `#${os?.numero ?? ""}`;
-}
-
 // Nomes de quem está ajudando AGORA na O.S. (só faz sentido em andamento).
 // Deixa o executor — e a equipe — ver quem entrou pra ajudar.
 function ajudantesHtml(os) {
@@ -540,13 +534,20 @@ function camposOSHtml(os) {
   // disciplina: na edição vem da própria O.S.; numa nova, o default é a
   // especialidade do colaborador (ele pode trocar).
   const disc = os.disciplina || (perfil && perfil.especialidade) || "";
+  // Na EDIÇÃO, trocar a disciplina regera o registro (M-007 vira E-0xx e o
+  // número antigo é aposentado) — quem já anotou o número no papel se perde,
+  // então o aviso tem que estar à vista. Numa O.S. nova não há o que avisar.
+  const avisoDisc = os.registro
+    ? `<p class="field-aviso">⚠️ Trocar a disciplina muda o registro desta O.S. — ela deixa de ser
+       <strong>${escapeHtml(os.registro)}</strong> e ganha um número novo. O número antigo é aposentado.</p>`
+    : "";
 
   return `
     <div class="field"><label>Disciplina</label>
       <div class="radio-group">
         <label class="radio-option"><input type="radio" name="disciplina" value="Mecânica" ${disc === "Mecânica" ? "checked" : ""} required /> Mecânica</label>
         <label class="radio-option"><input type="radio" name="disciplina" value="Elétrica" ${disc === "Elétrica" ? "checked" : ""} required /> Elétrica</label>
-      </div></div>
+      </div>${avisoDisc}</div>
 
     <div class="field"><label>Setor solicitante</label>
       <select id="f-setor" required><option value="">Selecione...</option>${opcoesSetor}</select></div>

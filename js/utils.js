@@ -28,6 +28,14 @@ export function slugPrio(prioridade) {
   return { "Normal": "prio-normal", "Prioritária": "prio-prioritaria", "Emergencial": "prio-emergencial" }[prioridade] || "prio-normal";
 }
 
+// Identificador da O.S. como a equipe fala no dia a dia: o registro
+// sequencial por disciplina (M-007 / E-003). O código antigo (07/26-P04)
+// e o #N interno ficam só de fallback pras O.S. anteriores ao registro.
+// Fonte única — antes essa lógica estava repetida em 5 telas.
+export function osLabel(os) {
+  return os?.registro || os?.codigo || `#${os?.numero ?? ""}`;
+}
+
 export function escapeHtml(str) {
   const div = document.createElement("div");
   div.textContent = str ?? "";

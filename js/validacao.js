@@ -1,5 +1,5 @@
 import { supabase, exigirSessao, sair } from "./supabaseClient.js";
-import { escapeHtml } from "./utils.js";
+import { escapeHtml, osLabel } from "./utils.js";
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -64,7 +64,7 @@ async function carregar() {
 
   const { data, error } = await supabase
     .from("ordens_servico")
-    .select("id, codigo, numero, setor_solicitante, status, disciplina, chave, equipamentos(nome), equipamento_outro")
+    .select("id, registro, codigo, numero, setor_solicitante, status, disciplina, chave, numero_solicitacao, equipamentos(nome), equipamento_outro")
     .neq("status", "Cancelada")
     .order("criada_em", { ascending: true }); // ordem de chegada: a mais antiga esperando a chave fica no topo
 
@@ -109,18 +109,24 @@ function render() {
 function cardHtml(os) {
   const equip = os.equipamentos?.nome || os.equipamento_outro || "—";
   const rotuloBtn = os.chave ? "Atualizar" : "Salvar";
+  // O valor original vai no data-original pra só chamar a RPC do nº da
+  // solicitação quando ele realmente mudou.
+  const sol = os.numero_solicitacao || "";
   return `
     <div class="val-card" data-os="${os.id}">
       <div class="val-head">
         <div class="val-id">
-          <span class="mono val-codigo">${escapeHtml(os.codigo || "#" + os.numero)}</span>
+          <span class="mono val-codigo">${escapeHtml(osLabel(os))}</span>
           ${os.disciplina ? `<span class="os-disc disc-${os.disciplina === "Mecânica" ? "mec" : "ele"}">${os.disciplina === "Mecânica" ? "⚙️" : "⚡"} ${escapeHtml(os.disciplina)}</span>` : ""}
           <span class="val-equip">${escapeHtml(equip)}</span>
           <span class="val-status">${escapeHtml(os.status)}</span>
         </div>
         <div class="val-acao">
-          <input class="val-input" type="text" inputmode="numeric" pattern="\\d*" maxlength="20"
-                 value="${escapeHtml(os.chave || "")}" placeholder="chave (mín. 10 díg.)" />
+          <input class="val-input val-input-chave" type="text" inputmode="numeric" pattern="\\d*" maxlength="20"
+                 value="${escapeHtml(os.chave || "")}" placeholder="chave (mín. 8 díg.)" />
+          <input class="val-input val-input-sol" type="text" maxlength="60"
+                 value="${escapeHtml(sol)}" data-original="${escapeHtml(sol)}"
+                 placeholder="nº solicitação (opcional)" />
           <button class="btn-primary val-salvar" data-os="${os.id}">${rotuloBtn}</button>
         </div>
       </div>
@@ -156,13 +162,17 @@ async function onListaClick(e) {
   if (!btn) return;
   const osId = btn.dataset.os;
   const card = btn.closest(".val-card");
-  const input = card.querySelector(".val-input");
+  const inputChave = card.querySelector(".val-input-chave");
+  const inputSol = card.querySelector(".val-input-sol");
   const erro = card.querySelector(`[data-erro="${osId}"]`);
-  const chave = input.value.trim();
+  const chave = inputChave.value.trim();
+  const sol = inputSol.value.trim();
 
   erro.style.display = "none";
-  if (!/^\d{10,}$/.test(chave)) {
-    erro.textContent = "A chave deve ter só números, no mínimo 10 dígitos.";
+  // Chave vazia é permitida (salva só o nº da solicitação, ou limpa uma chave
+  // lançada por engano). Se veio preenchida, tem que ser válida.
+  if (chave && !/^\d{8,}$/.test(chave)) {
+    erro.textContent = "A chave deve ter só números, no mínimo 8 dígitos.";
     erro.style.display = "block";
     return;
   }
@@ -175,5 +185,19 @@ async function onListaClick(e) {
     btn.disabled = false;
     return;
   }
+
+  // Nº da solicitação é opcional e vive numa RPC própria — só chama se mudou.
+  if (sol !== (inputSol.dataset.original || "")) {
+    const { error: erroSol } = await supabase.rpc("definir_numero_solicitacao", {
+      p_os_id: osId, p_numero: sol,
+    });
+    if (erroSol) {
+      erro.textContent = erroSol.message;
+      erro.style.display = "block";
+      btn.disabled = false;
+      return;
+    }
+  }
+
   await carregar();
 }
